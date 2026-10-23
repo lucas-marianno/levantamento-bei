@@ -12,7 +12,7 @@ const COLUMNS = [
   { label: "Autor", type: "text" },
   { label: "ISBN", type: "text" },
   { label: "Cor da Etiqueta", type: "color" },
-  { label: "CDD (código decimal de dewey)", type: "text" },
+  { label: "CDD", type: "text" },
   { label: "Quantidade de Exemplares", type: "number" },
 ];
 
@@ -27,6 +27,13 @@ const COLOR_OPTIONS = [
 ];
 
 const identificationForm = document.getElementById("identification-form");
+const nameInput = document.getElementById("responsavel");
+const cpfInput = document.getElementById("cpf");
+const matriculaInput = document.getElementById("matricula");
+const nameError = document.getElementById("responsavel-error");
+const cpfError = document.getElementById("cpf-error");
+const matriculaError = document.getElementById("matricula-error");
+const schoolHint = document.getElementById("escola-hint");
 const schoolSelect = document.getElementById("escola");
 const bookSection = document.getElementById("book-section");
 const booksBody = document.getElementById("books-body");
@@ -34,9 +41,19 @@ const addRowsButton = document.getElementById("add-rows");
 const schoolDialog = document.getElementById("school-change-dialog");
 const cancelSchoolChangeButton = document.getElementById("cancel-school-change");
 const confirmSchoolChangeButton = document.getElementById("confirm-school-change");
+const cddInfoButton = document.getElementById("cdd-info-button");
+const cddTooltip = document.getElementById("cdd-tooltip");
+
+const touchedFields = {
+  name: false,
+  cpf: false,
+  matricula: false,
+};
 
 let currentSchool = "";
 let pendingSchool = null;
+let cddTooltipPinned = false;
+let cddTooltipHovered = false;
 
 function populateSchoolOptions() {
   const fragment = document.createDocumentFragment();
@@ -49,6 +66,49 @@ function populateSchoolOptions() {
   });
 
   schoolSelect.append(fragment);
+}
+
+function onlyDigits(value, maxLength) {
+  return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function isValidName() {
+  return nameInput.value.trim().length > 0;
+}
+
+function isValidCpf() {
+  return /^\d{11}$/.test(cpfInput.value);
+}
+
+function isValidMatricula() {
+  return /^\d{5}$/.test(matriculaInput.value);
+}
+
+function setFieldError(input, errorElement, isValid, showError) {
+  const show = showError && !isValid;
+
+  input.setAttribute("aria-invalid", String(show));
+  errorElement.hidden = !show;
+}
+
+function updateIdentificationState() {
+  const nameValid = isValidName();
+  const cpfValid = isValidCpf();
+  const matriculaValid = isValidMatricula();
+
+  setFieldError(nameInput, nameError, nameValid, touchedFields.name);
+  setFieldError(cpfInput, cpfError, cpfValid, touchedFields.cpf);
+  setFieldError(
+    matriculaInput,
+    matriculaError,
+    matriculaValid,
+    touchedFields.matricula
+  );
+
+  const formValid = nameValid && cpfValid && matriculaValid;
+
+  schoolSelect.disabled = !formValid;
+  schoolHint.hidden = formValid;
 }
 
 function applyColorStyle(select) {
@@ -200,6 +260,66 @@ function confirmSchoolChange() {
   renderBookTable();
 }
 
+function positionCddTooltip() {
+  const buttonRect = cddInfoButton.getBoundingClientRect();
+  const tooltipRect = cddTooltip.getBoundingClientRect();
+  const margin = 8;
+  const gap = 8;
+  let left = buttonRect.left + buttonRect.width / 2 - tooltipRect.width / 2;
+  let top = buttonRect.bottom + gap;
+
+  left = Math.min(
+    Math.max(left, margin),
+    window.innerWidth - tooltipRect.width - margin
+  );
+
+  if (top + tooltipRect.height > window.innerHeight - margin) {
+    top = buttonRect.top - tooltipRect.height - gap;
+  }
+
+  cddTooltip.style.left = `${left}px`;
+  cddTooltip.style.top = `${Math.max(margin, top)}px`;
+}
+
+function showCddTooltip() {
+  cddTooltip.hidden = false;
+  cddInfoButton.setAttribute("aria-expanded", "true");
+  positionCddTooltip();
+}
+
+function hideCddTooltip(force = false) {
+  if (!force && (cddTooltipPinned || cddTooltipHovered)) {
+    return;
+  }
+
+  cddTooltip.hidden = true;
+  cddInfoButton.setAttribute("aria-expanded", "false");
+}
+
+nameInput.addEventListener("input", updateIdentificationState);
+nameInput.addEventListener("blur", () => {
+  touchedFields.name = true;
+  updateIdentificationState();
+});
+
+cpfInput.addEventListener("input", () => {
+  cpfInput.value = onlyDigits(cpfInput.value, 11);
+  updateIdentificationState();
+});
+cpfInput.addEventListener("blur", () => {
+  touchedFields.cpf = true;
+  updateIdentificationState();
+});
+
+matriculaInput.addEventListener("input", () => {
+  matriculaInput.value = onlyDigits(matriculaInput.value, 5);
+  updateIdentificationState();
+});
+matriculaInput.addEventListener("blur", () => {
+  touchedFields.matricula = true;
+  updateIdentificationState();
+});
+
 identificationForm.addEventListener("submit", (event) => {
   event.preventDefault();
 });
@@ -217,4 +337,70 @@ schoolDialog.addEventListener("close", () => {
   }
 });
 
+cddInfoButton.addEventListener("pointerenter", (event) => {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
+  cddTooltipHovered = true;
+  showCddTooltip();
+});
+cddInfoButton.addEventListener("pointerleave", (event) => {
+  if (event.pointerType === "touch") {
+    return;
+  }
+
+  cddTooltipHovered = false;
+  hideCddTooltip();
+});
+cddInfoButton.addEventListener("click", () => {
+  cddTooltipPinned = !cddTooltipPinned;
+
+  if (cddTooltipPinned) {
+    showCddTooltip();
+  } else {
+    hideCddTooltip();
+  }
+});
+cddInfoButton.addEventListener("blur", () => {
+  cddTooltipPinned = false;
+  hideCddTooltip();
+});
+
+document.addEventListener("click", (event) => {
+  if (cddTooltip.hidden || cddInfoButton.contains(event.target)) {
+    return;
+  }
+
+  cddTooltipPinned = false;
+  cddTooltipHovered = false;
+  hideCddTooltip(true);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || cddTooltip.hidden) {
+    return;
+  }
+
+  cddTooltipPinned = false;
+  cddTooltipHovered = false;
+  hideCddTooltip(true);
+});
+
+window.addEventListener("resize", () => {
+  if (!cddTooltip.hidden) {
+    positionCddTooltip();
+  }
+});
+document.addEventListener(
+  "scroll",
+  () => {
+    if (!cddTooltip.hidden) {
+      positionCddTooltip();
+    }
+  },
+  true
+);
+
 populateSchoolOptions();
+updateIdentificationState();

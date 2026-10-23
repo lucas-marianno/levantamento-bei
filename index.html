@@ -3,12 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#365caa">
   <title>Registro de Livros</title>
+  <link rel="icon" type="image/png" sizes="96x96" href="assets/favicon/favicon-96x96.png">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon/favicon.svg">
+  <link rel="shortcut icon" href="assets/favicon/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon/apple-touch-icon.png">
+  <link rel="manifest" href="assets/favicon/site.webmanifest">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="page">
     <header class="page-header">
+      <img
+        class="brand-logo"
+        src="assets/pmsbc-logo.png"
+        alt="Prefeitura de São Bernardo do Campo"
+      >
       <h1>Registro de Livros</h1>
     </header>
 
@@ -23,7 +34,12 @@
             id="responsavel"
             name="responsavel"
             placeholder="Digite o nome completo"
+            aria-required="true"
+            aria-describedby="responsavel-error"
           >
+          <p class="field-error" id="responsavel-error" hidden>
+            Informe o nome do responsável.
+          </p>
         </div>
 
         <div class="field-row">
@@ -34,8 +50,14 @@
               id="cpf"
               name="cpf"
               inputmode="numeric"
-              placeholder="000.000.000-00"
+              pattern="[0-9]{11}"
+              placeholder="Digite os 11 dígitos"
+              aria-required="true"
+              aria-describedby="cpf-error"
             >
+            <p class="field-error" id="cpf-error" hidden>
+              O CPF deve conter 11 dígitos.
+            </p>
           </div>
 
           <div class="field">
@@ -44,16 +66,31 @@
               type="text"
               id="matricula"
               name="matricula"
-              placeholder="Digite a matrícula"
+              inputmode="numeric"
+              pattern="[0-9]{5}"
+              placeholder="Digite os 5 dígitos"
+              aria-required="true"
+              aria-describedby="matricula-error"
             >
+            <p class="field-error" id="matricula-error" hidden>
+              A matrícula deve conter 5 dígitos.
+            </p>
           </div>
         </div>
 
         <div class="field">
           <label for="escola">Selecione a EMEB:</label>
-          <select id="escola" name="escola">
+          <select
+            id="escola"
+            name="escola"
+            disabled
+            aria-describedby="escola-hint"
+          >
             <option value="" selected disabled>Selecione...</option>
           </select>
+          <p class="field-hint" id="escola-hint">
+            Preencha o nome, o CPF e a matrícula para selecionar a EMEB.
+          </p>
         </div>
       </form>
     </section>
@@ -69,7 +106,22 @@
               <th scope="col">Autor</th>
               <th scope="col">ISBN</th>
               <th scope="col">Cor da Etiqueta</th>
-              <th scope="col">CDD (código decimal de dewey)</th>
+              <th scope="col">
+                <span class="header-label">
+                  CDD
+                  <button
+                    type="button"
+                    id="cdd-info-button"
+                    class="info-button"
+                    aria-label="Saiba mais sobre CDD"
+                    aria-expanded="false"
+                    aria-controls="cdd-tooltip"
+                    aria-describedby="cdd-tooltip"
+                  >
+                    <span aria-hidden="true">i</span>
+                  </button>
+                </span>
+              </th>
               <th scope="col">Quantidade de Exemplares</th>
             </tr>
           </thead>
@@ -78,7 +130,7 @@
       </div>
 
       <div class="table-actions">
-        <button type="button" id="add-rows" class="btn btn-secondary">
+        <button type="button" id="add-rows" class="btn btn-primary">
           Adicionar 10 linhas
         </button>
       </div>
@@ -109,6 +161,10 @@
       </div>
     </div>
   </dialog>
+
+  <div id="cdd-tooltip" class="tooltip" role="tooltip" hidden>
+    Classificação Decimal de Dewey
+  </div>
 
   <script src="script.js"></script>
 </body>
