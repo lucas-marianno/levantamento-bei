@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registro de Livros</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <h1>Registro de Livros</h1>
+    </header>
+
+    <section class="card" aria-labelledby="identification-title">
+      <h2 id="identification-title">Identificação</h2>
+
+      <form id="identification-form" autocomplete="off">
+        <div class="field">
+          <label for="responsavel">Nome do Responsável pelo Preenchimento</label>
+          <input
+            type="text"
+            id="responsavel"
+            name="responsavel"
+            placeholder="Digite o nome completo"
+          >
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="cpf">CPF</label>
+            <input
+              type="text"
+              id="cpf"
+              name="cpf"
+              inputmode="numeric"
+              placeholder="000.000.000-00"
+            >
+          </div>
+
+          <div class="field">
+            <label for="matricula">Matrícula</label>
+            <input
+              type="text"
+              id="matricula"
+              name="matricula"
+              placeholder="Digite a matrícula"
+            >
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="escola">Selecione a EMEB:</label>
+          <select id="escola" name="escola">
+            <option value="" selected disabled>Selecione...</option>
+          </select>
+        </div>
+      </form>
+    </section>
+
+    <section id="book-section" class="card table-card" hidden aria-labelledby="books-title">
+      <h2 id="books-title">Livros</h2>
+
+      <div class="table-scroll">
+        <table id="books-table">
+          <thead>
+            <tr>
+              <th scope="col">Título do Livro</th>
+              <th scope="col">Autor</th>
+              <th scope="col">ISBN</th>
+              <th scope="col">Cor da Etiqueta</th>
+              <th scope="col">CDD (código decimal de dewey)</th>
+              <th scope="col">Quantidade de Exemplares</th>
+            </tr>
+          </thead>
+          <tbody id="books-body"></tbody>
+        </table>
+      </div>
+
+      <div class="table-actions">
+        <button type="button" id="add-rows" class="btn btn-secondary">
+          Adicionar 10 linhas
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <dialog
+    id="school-change-dialog"
+    class="warning-dialog"
+    aria-labelledby="warning-title"
+    aria-describedby="warning-description"
+  >
+    <div class="warning-content">
+      <div class="warning-icon" aria-hidden="true">!</div>
+      <h2 id="warning-title">Atenção!</h2>
+      <p id="warning-description">
+        Trocar a EMEB apagará <strong>todos os dados já preenchidos na tabela</strong>.
+      </p>
+      <p class="warning-note">Essa ação não pode ser desfeita.</p>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancel-school-change" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="confirm-school-change" class="btn btn-danger">
+          Apagar e trocar
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="script.js"></script>
+</body>
+</html>
