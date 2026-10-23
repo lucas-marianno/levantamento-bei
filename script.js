@@ -7,13 +7,20 @@ function schoolSelector() {
   ];
 }
 
+async function submitSurvey(payload) {
+  return { success: true };
+}
+
+const STORAGE_KEY = "registro-livros:draft";
+const SUBMIT_LABEL = "Enviar Levantamento de Livros";
+
 const COLUMNS = [
-  { label: "Título do Livro", type: "text" },
-  { label: "Autor", type: "text" },
-  { label: "ISBN", type: "text" },
-  { label: "Cor da Etiqueta", type: "color" },
-  { label: "CDD", type: "text" },
-  { label: "Quantidade de Exemplares", type: "number" },
+  { key: "titulo", label: "Título do Livro", type: "text" },
+  { key: "autor", label: "Autor", type: "text" },
+  { key: "isbn", label: "ISBN", type: "text" },
+  { key: "corEtiqueta", label: "Cor da Etiqueta", type: "color" },
+  { key: "cdd", label: "CDD", type: "text" },
+  { key: "quantidade", label: "Quantidade de Exemplares", type: "number" },
 ];
 
 const COLOR_OPTIONS = [
@@ -38,6 +45,8 @@ const schoolSelect = document.getElementById("escola");
 const bookSection = document.getElementById("book-section");
 const booksBody = document.getElementById("books-body");
 const addRowsButton = document.getElementById("add-rows");
+const submitSurveyButton = document.getElementById("submit-survey");
+const surveyFeedback = document.getElementById("survey-feedback");
 const schoolDialog = document.getElementById("school-change-dialog");
 const cancelSchoolChangeButton = document.getElementById("cancel-school-change");
 const confirmSchoolChangeButton = document.getElementById("confirm-school-change");
@@ -54,6 +63,7 @@ let currentSchool = "";
 let pendingSchool = null;
 let cddTooltipPinned = false;
 let cddTooltipHovered = false;
+let isSubmitting = false;
 
 function populateSchoolOptions() {
   const fragment = document.createDocumentFragment();
@@ -109,6 +119,26 @@ function updateIdentificationState() {
 
   schoolSelect.disabled = !formValid;
   schoolHint.hidden = formValid;
+}
+
+function showFeedback(message, type, reason) {
+  surveyFeedback.textContent = message;
+  surveyFeedback.className = `feedback ${type}`;
+  surveyFeedback.dataset.reason = reason;
+  surveyFeedback.hidden = false;
+}
+
+function hideFeedback() {
+  surveyFeedback.hidden = true;
+  surveyFeedback.textContent = "";
+  surveyFeedback.className = "feedback";
+  delete surveyFeedback.dataset.reason;
+}
+
+function hideFeedbackOnDataChange() {
+  if (surveyFeedback.dataset.reason !== "incomplete") {
+    hideFeedback();
+  }
 }
 
 function applyColorStyle(select) {
@@ -170,7 +200,23 @@ function createInput(label, type) {
   return input;
 }
 
-function createBookRow() {
+function createDeleteButton() {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "delete-row-button";
+  button.setAttribute("aria-label", "Excluir linha");
+  button.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      <path d="M8 6V4h8v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M19 6l-1 14H6L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M10 11v5M14 11v5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+    </svg>
+  `;
+  return button;
+}
+
+function createBookRow(values = {}) {
   const row = document.createElement("tr");
 
   COLUMNS.forEach((column) => {
@@ -180,9 +226,22 @@ function createBookRow() {
         ? createColorSelect(column.label)
         : createInput(column.label, column.type);
 
+    if (values[column.key] !== undefined && values[column.key] !== null) {
+      control.value = String(values[column.key]);
+    }
+
+    if (column.type === "color") {
+      applyColorStyle(control);
+    }
+
     cell.append(control);
     row.append(cell);
   });
+
+  const actionCell = document.createElement("td");
+  actionCell.className = "row-actions";
+  actionCell.append(createDeleteButton());
+  row.append(actionCell);
 
   return row;
 }
@@ -197,16 +256,87 @@ function appendRows(count) {
   booksBody.append(fragment);
 }
 
-function renderBookTable() {
+function renderBookTable(rows) {
   booksBody.replaceChildren();
-  appendRows(10);
+
+  if (Array.isArray(rows) && rows.length > 0) {
+    rows.forEach((values) => booksBody.append(createBookRow(values)));
+  } else {
+    appendRows(10);
+  }
+
   bookSection.hidden = false;
 }
 
+function getRowControls(row) {
+  return Array.from(row.querySelectorAll("input, select"));
+}
+
+function getRowValues(row) {
+  const controls = getRowControls(row);
+  const values = {};
+
+  COLUMNS.forEach((column, index) => {
+    values[column.key] = controls[index]?.value ?? "";
+  });
+
+  return values;
+}
+
+function getRowState(row) {
+  const values = getRowControls(row).map((control) => control.value.trim());
+
+  if (values.every((value) => value === "")) {
+    return "empty";
+  }
+
+  if (values.every((value) => value !== "")) {
+    return "complete";
+  }
+
+  return "partial";
+}
+
+function setRowFlag(row, flagged) {
+  row.classList.toggle("row-incomplete", flagged);
+
+  getRowControls(row).forEach((control) => {
+    if (flagged) {
+      control.setAttribute(
+        "aria-invalid",
+        String(control.value.trim() === "")
+      );
+    } else {
+      control.removeAttribute("aria-invalid");
+    }
+  });
+}
+
+function clearAllRowFlags() {
+  booksBody.querySelectorAll("tr.row-incomplete").forEach((row) => {
+    setRowFlag(row, false);
+  });
+}
+
+function refreshFlaggedRow(row) {
+  if (!row.classList.contains("row-incomplete")) {
+    return;
+  }
+
+  if (getRowState(row) !== "partial") {
+    setRowFlag(row, false);
+  }
+
+  if (
+    !booksBody.querySelector("tr.row-incomplete") &&
+    surveyFeedback.dataset.reason === "incomplete"
+  ) {
+    hideFeedback();
+  }
+}
+
 function rowIsEmpty(row) {
-  return Array.from(row.querySelectorAll("input, select")).every(
-    (control) => control.value.trim() === ""
-  );
+  return getRowState(row) === "empty";
 }
 
 function hasEmptyRow() {
@@ -219,22 +349,149 @@ function hasTableData() {
   );
 }
 
-function handleTableChange() {
+function saveState() {
+  const state = {
+    version: 1,
+    form: {
+      responsavel: nameInput.value,
+      cpf: cpfInput.value,
+      matricula: matriculaInput.value,
+    },
+    school: currentSchool,
+    rows: Array.from(booksBody.querySelectorAll("tr")).map(getRowValues),
+  };
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Storage may be unavailable or full.
+  }
+}
+
+function loadState() {
+  try {
+    const rawState = localStorage.getItem(STORAGE_KEY);
+    return rawState ? JSON.parse(rawState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function restoreState() {
+  const state = loadState();
+
+  if (!state || typeof state !== "object") {
+    return;
+  }
+
+  const form = state.form && typeof state.form === "object" ? state.form : {};
+  nameInput.value =
+    typeof form.responsavel === "string" ? form.responsavel : "";
+  cpfInput.value = onlyDigits(String(form.cpf ?? ""), 11);
+  matriculaInput.value = onlyDigits(String(form.matricula ?? ""), 5);
+
+  const savedSchool = typeof state.school === "string" ? state.school : "";
+  const schoolExists = Array.from(schoolSelect.options).some(
+    (option) => option.value !== "" && option.value === savedSchool
+  );
+
+  if (schoolExists) {
+    currentSchool = savedSchool;
+    schoolSelect.value = savedSchool;
+  }
+
+  const rows = Array.isArray(state.rows) ? state.rows : [];
+
+  if (schoolExists || rows.length > 0) {
+    renderBookTable(rows);
+  }
+}
+
+function handleNameInput() {
+  updateIdentificationState();
+  hideFeedbackOnDataChange();
+  saveState();
+}
+
+function handleCpfInput() {
+  cpfInput.value = onlyDigits(cpfInput.value, 11);
+  updateIdentificationState();
+  hideFeedbackOnDataChange();
+  saveState();
+}
+
+function handleMatriculaInput() {
+  matriculaInput.value = onlyDigits(matriculaInput.value, 5);
+  updateIdentificationState();
+  hideFeedbackOnDataChange();
+  saveState();
+}
+
+function handleTableChange(event) {
   if (!hasEmptyRow()) {
     appendRows(1);
   }
+
+  const row = event.target.closest("tr");
+
+  if (row) {
+    refreshFlaggedRow(row);
+  }
+
+  hideFeedbackOnDataChange();
+  saveState();
+}
+
+function handleTableClick(event) {
+  const deleteButton = event.target.closest(".delete-row-button");
+
+  if (!deleteButton) {
+    return;
+  }
+
+  const row = deleteButton.closest("tr");
+
+  if (!row) {
+    return;
+  }
+
+  row.remove();
+
+  if (!booksBody.querySelector("tr")) {
+    appendRows(1);
+  }
+
+  hideFeedbackOnDataChange();
+
+  if (
+    !booksBody.querySelector("tr.row-incomplete") &&
+    surveyFeedback.dataset.reason === "incomplete"
+  ) {
+    hideFeedback();
+  }
+
+  saveState();
+}
+
+function handleAddRows() {
+  appendRows(10);
+  hideFeedbackOnDataChange();
+  saveState();
 }
 
 function handleSchoolChange() {
   const nextSchool = schoolSelect.value;
 
-  if (nextSchool === currentSchool) {
+  if (!nextSchool || nextSchool === currentSchool) {
     return;
   }
+
+  hideFeedbackOnDataChange();
 
   if (!hasTableData()) {
     currentSchool = nextSchool;
     renderBookTable();
+    saveState();
     return;
   }
 
@@ -258,6 +515,145 @@ function confirmSchoolChange() {
   pendingSchool = null;
   schoolDialog.close();
   renderBookTable();
+  saveState();
+}
+
+function formatRowNumbers(rowNumbers) {
+  if (rowNumbers.length === 1) {
+    return String(rowNumbers[0]);
+  }
+
+  if (rowNumbers.length === 2) {
+    return `${rowNumbers[0]} e ${rowNumbers[1]}`;
+  }
+
+  return `${rowNumbers.slice(0, -1).join(", ")} e ${rowNumbers.at(-1)}`;
+}
+
+function buildSurveyPayload(rows) {
+  return {
+    responsavel: nameInput.value.trim(),
+    cpf: cpfInput.value,
+    matricula: matriculaInput.value,
+    escola: currentSchool,
+    livros: rows.map((row) => {
+      const values = getRowValues(row);
+
+      return {
+        titulo: values.titulo.trim(),
+        autor: values.autor.trim(),
+        isbn: values.isbn.trim(),
+        corEtiqueta: values.corEtiqueta,
+        cdd: values.cdd.trim(),
+        quantidade: Number(values.quantidade),
+      };
+    }),
+  };
+}
+
+async function handleSubmitSurvey() {
+  if (isSubmitting) {
+    return;
+  }
+
+  clearAllRowFlags();
+  hideFeedback();
+
+  touchedFields.name = true;
+  touchedFields.cpf = true;
+  touchedFields.matricula = true;
+  updateIdentificationState();
+
+  const rowElements = Array.from(booksBody.querySelectorAll("tr"));
+  const partialRowNumbers = [];
+  const completeRows = [];
+
+  rowElements.forEach((row, index) => {
+    const state = getRowState(row);
+
+    if (state === "partial") {
+      partialRowNumbers.push(index + 1);
+      setRowFlag(row, true);
+    } else if (state === "complete") {
+      completeRows.push(row);
+    }
+  });
+
+  if (!isValidName() || !isValidCpf() || !isValidMatricula()) {
+    showFeedback(
+      "Preencha corretamente o nome, o CPF e a matrícula antes de enviar.",
+      "error",
+      "submit"
+    );
+    return;
+  }
+
+  if (partialRowNumbers.length > 0) {
+    showFeedback(
+      `Linhas parcialmente preenchidas: ${formatRowNumbers(
+        partialRowNumbers
+      )}. Preencha todos os campos ou exclua essas linhas.`,
+      "error",
+      "incomplete"
+    );
+    booksBody
+      .querySelector("tr.row-incomplete")
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  if (!currentSchool) {
+    showFeedback(
+      "Selecione uma EMEB antes de enviar o levantamento.",
+      "error",
+      "submit"
+    );
+    return;
+  }
+
+  if (completeRows.length === 0) {
+    showFeedback(
+      "Preencha ao menos uma linha de livro antes de enviar.",
+      "error",
+      "submit"
+    );
+    return;
+  }
+
+  const payload = buildSurveyPayload(completeRows);
+
+  isSubmitting = true;
+  submitSurveyButton.disabled = true;
+  submitSurveyButton.textContent = "Enviando...";
+
+  try {
+    const result = await submitSurvey(payload);
+
+    if (result?.success === false) {
+      throw new Error(
+        result.message || "Não foi possível enviar o levantamento."
+      );
+    }
+
+    showFeedback(
+      "Levantamento de livros enviado com sucesso.",
+      "success",
+      "sent"
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro inesperado no envio.";
+
+    showFeedback(
+      `Não foi possível enviar o levantamento: ${message}`,
+      "error",
+      "submit"
+    );
+  } finally {
+    isSubmitting = false;
+    submitSurveyButton.disabled = false;
+    submitSurveyButton.textContent = SUBMIT_LABEL;
+  }
 }
 
 function positionCddTooltip() {
@@ -296,25 +692,19 @@ function hideCddTooltip(force = false) {
   cddInfoButton.setAttribute("aria-expanded", "false");
 }
 
-nameInput.addEventListener("input", updateIdentificationState);
+nameInput.addEventListener("input", handleNameInput);
 nameInput.addEventListener("blur", () => {
   touchedFields.name = true;
   updateIdentificationState();
 });
 
-cpfInput.addEventListener("input", () => {
-  cpfInput.value = onlyDigits(cpfInput.value, 11);
-  updateIdentificationState();
-});
+cpfInput.addEventListener("input", handleCpfInput);
 cpfInput.addEventListener("blur", () => {
   touchedFields.cpf = true;
   updateIdentificationState();
 });
 
-matriculaInput.addEventListener("input", () => {
-  matriculaInput.value = onlyDigits(matriculaInput.value, 5);
-  updateIdentificationState();
-});
+matriculaInput.addEventListener("input", handleMatriculaInput);
 matriculaInput.addEventListener("blur", () => {
   touchedFields.matricula = true;
   updateIdentificationState();
@@ -326,7 +716,9 @@ identificationForm.addEventListener("submit", (event) => {
 schoolSelect.addEventListener("change", handleSchoolChange);
 booksBody.addEventListener("input", handleTableChange);
 booksBody.addEventListener("change", handleTableChange);
-addRowsButton.addEventListener("click", () => appendRows(10));
+booksBody.addEventListener("click", handleTableClick);
+addRowsButton.addEventListener("click", handleAddRows);
+submitSurveyButton.addEventListener("click", handleSubmitSurvey);
 cancelSchoolChangeButton.addEventListener("click", cancelSchoolChange);
 confirmSchoolChangeButton.addEventListener("click", confirmSchoolChange);
 
@@ -403,4 +795,5 @@ document.addEventListener(
 );
 
 populateSchoolOptions();
+restoreState();
 updateIdentificationState();

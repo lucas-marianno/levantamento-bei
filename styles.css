@@ -44,6 +44,18 @@
   display: none !important;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -223,10 +235,14 @@ select:disabled:hover {
 
 table {
   width: 100%;
-  min-width: 1000px;
+  min-width: 1060px;
   border-collapse: separate;
   border-spacing: 0;
   background: var(--surface);
+}
+
+.row-actions-header {
+  width: 54px;
 }
 
 thead th {
@@ -298,6 +314,54 @@ tbody tr:hover td {
   background: var(--brand-blue-soft);
 }
 
+tbody tr.row-incomplete td {
+  background: #fff1e6;
+}
+
+tbody tr.row-incomplete td:first-child {
+  box-shadow: inset 4px 0 0 var(--brand-orange);
+}
+
+tbody tr.row-incomplete:hover td {
+  background: #ffe7d5;
+}
+
+td.row-actions {
+  width: 54px;
+  text-align: center;
+}
+
+.delete-row-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--brand-orange-dark);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.delete-row-button:hover {
+  color: var(--brand-orange-dark);
+  background: #fff0e5;
+  border-color: #f4c7a7;
+}
+
+.delete-row-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.3);
+}
+
+.delete-row-button svg {
+  width: 16px;
+  height: 16px;
+}
+
 td input,
 td select {
   min-width: 0;
@@ -331,8 +395,32 @@ td input[type="number"] {
 
 .table-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
   margin-top: 16px;
+}
+
+.feedback {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.feedback.success {
+  color: #0b5a27;
+  background: #e7f8ed;
+  border-color: #a8dfba;
+}
+
+.feedback.error {
+  color: #8a3600;
+  background: #fff1e6;
+  border-color: #f4c39f;
 }
 
 .btn {
@@ -357,6 +445,11 @@ td input[type="number"] {
 .btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 
 .btn-primary {
@@ -487,6 +580,11 @@ td input[type="number"] {
 
   .field-row {
     grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .dialog-actions {

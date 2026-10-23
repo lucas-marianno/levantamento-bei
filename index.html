@@ -123,6 +123,9 @@
                 </span>
               </th>
               <th scope="col">Quantidade de Exemplares</th>
+              <th scope="col" class="row-actions-header">
+                <span class="sr-only">Ações</span>
+              </th>
             </tr>
           </thead>
           <tbody id="books-body"></tbody>
@@ -130,10 +133,21 @@
       </div>
 
       <div class="table-actions">
-        <button type="button" id="add-rows" class="btn btn-primary">
+        <button type="button" id="add-rows" class="btn btn-secondary">
           Adicionar 10 linhas
         </button>
+        <button type="button" id="submit-survey" class="btn btn-primary">
+          Enviar Levantamento de Livros
+        </button>
       </div>
+
+      <div
+        id="survey-feedback"
+        class="feedback"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
     </section>
   </main>
 
