@@ -18,5 +18,40 @@
   "themes": [
     "Tema Exemplo 1",
     "Tema Exemplo 2"
-  ]
+  ],
+  "v3": {
+    "initialThemeRows": 5,
+    "cddCategories": [
+      {
+        "range": "000-099",
+        "color": "BRANCA",
+        "label": "Generalidades"
+      },
+      {
+        "range": "100-199",
+        "color": "AMARELA",
+        "label": "Filosofia e Religião"
+      },
+      {
+        "range": "200-299",
+        "color": "AZUL",
+        "label": "Religião"
+      },
+      {
+        "range": "300-399",
+        "color": "VERDE",
+        "label": "Ciências Sociais"
+      }
+    ],
+    "themes": [
+      {
+        "id": "indigena",
+        "label": "Temática Indígena"
+      },
+      {
+        "id": "africana",
+        "label": "Temática Africana"
+      }
+    ]
+  }
 }

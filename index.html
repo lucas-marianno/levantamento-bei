@@ -98,7 +98,12 @@
       </form>
     </section>
 
-    <section id="book-section" class="card table-card" hidden aria-labelledby="books-title">
+    <!--
+      @deprecated v2
+      The old "Livros" block is kept for rollback. It is hidden and is not
+      wired by the v3 UI. See the deprecation note at the top of script.js.
+    -->
+    <section id="book-section" class="card table-card" hidden aria-labelledby="books-title" aria-hidden="true">
       <h2 id="books-title">Livros</h2>
 
       <div class="table-scroll">
@@ -152,6 +157,76 @@
 
       <div
         id="survey-feedback"
+        class="feedback"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+    </section>
+
+    <section
+      id="cdd-form-section"
+      class="card table-card"
+      hidden
+      aria-labelledby="cdd-form-title"
+    >
+      <h2 id="cdd-form-title">
+        <span class="header-label">
+          Quantidade de Exemplares por CDD
+          <button
+            type="button"
+            id="cdd-form-info-button"
+            class="info-button"
+            aria-label="Saiba mais sobre CDD"
+            aria-expanded="false"
+            aria-controls="cdd-tooltip"
+            aria-describedby="cdd-tooltip"
+          >
+            <span aria-hidden="true">i</span>
+          </button>
+        </span>
+      </h2>
+
+      <p class="field-hint">
+        Informe a quantidade de exemplares de cada classificação ou marque que a
+        escola não possui acervo com a classificação.
+      </p>
+
+      <div class="table-scroll">
+        <table id="cdd-form-table" class="cdd-form-table">
+          <thead>
+            <tr>
+              <th scope="col">Classificação (CDD / Cor)</th>
+              <th scope="col" class="cdd-quantity-header">
+                Quantidade de Exemplares
+              </th>
+              <th scope="col" class="cdd-unavailable-header">
+                Não possuímos acervo com essa classificação
+              </th>
+            </tr>
+          </thead>
+          <tbody id="cdd-form-body"></tbody>
+        </table>
+      </div>
+
+      <div class="cdd-form-footer">
+        <span id="cdd-form-status" class="save-status"></span>
+      </div>
+    </section>
+
+    <div id="theme-blocks"></div>
+
+    <section id="save-section" class="card" hidden aria-labelledby="save-title">
+      <h2 id="save-title" class="sr-only">Salvar levantamento</h2>
+
+      <div class="table-actions save-actions">
+        <button type="button" id="submit-survey-v3" class="btn btn-primary">
+          Salvar
+        </button>
+      </div>
+
+      <div
+        id="survey-feedback-v3"
         class="feedback"
         role="status"
         aria-live="polite"
