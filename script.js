@@ -1,26 +1,92 @@
-function schoolSelector() {
-  return [
-    "EMEB Monteiro Lobato",
-    "EMEB Cecília Meireles",
-    "EMEB Paulo Freire",
-    "EMEB Carlos Drummond de Andrade",
-  ];
-}
-
-async function submitSurvey(payload) {
-  return { success: true };
-}
-
 const STORAGE_KEY = "registro-livros:draft";
-const SUBMIT_LABEL = "Enviar Levantamento de Livros";
+const DRAFT_VERSION = 2;
+const SAVE_LABEL = "Salvar";
+const SAVE_IN_PROGRESS_LABEL = "Salvando...";
+const OPTIONS_URL = "data/options.json";
+
+const ISBN_LOOKUP_DEBOUNCE_MS = 650;
+
+const FALLBACK_OPTIONS = {
+  schools: ["EMEB Exemplo 1", "EMEB Exemplo 2"],
+  cdd: [
+    { value: "000", label: "000 - Generalidades" },
+    { value: "010", label: "010 - Bibliografia" },
+  ],
+  themes: ["Tema Exemplo 1", "Tema Exemplo 2"],
+};
+
+let appOptions = { ...FALLBACK_OPTIONS };
 
 const COLUMNS = [
-  { key: "titulo", label: "Título do Livro", type: "text" },
-  { key: "autor", label: "Autor", type: "text" },
-  { key: "isbn", label: "ISBN", type: "text" },
-  { key: "corEtiqueta", label: "Cor da Etiqueta", type: "color" },
-  { key: "cdd", label: "CDD", type: "text" },
-  { key: "quantidade", label: "Quantidade de Exemplares", type: "number" },
+  {
+    key: "titulo",
+    label: "Título do Livro",
+    type: "text",
+    required: true,
+    sanitize: true,
+  },
+  {
+    key: "autor",
+    label: "Autor",
+    type: "text",
+    required: true,
+    sanitize: true,
+  },
+  {
+    key: "editora",
+    label: "Editora",
+    type: "text",
+    required: true,
+  },
+  {
+    key: "isbn",
+    label: "ISBN",
+    type: "text",
+    required: (values) => !values.semIsbn,
+    isbn: true,
+  },
+  {
+    key: "semIsbn",
+    label: "Não possui ISBN",
+    type: "checkbox",
+  },
+  {
+    key: "corEtiqueta",
+    label: "Cor da Etiqueta",
+    type: "color",
+    required: (values) => !values.naoClassificado,
+  },
+  {
+    key: "cdd",
+    label: "CDD",
+    type: "select",
+    optionsKey: "cdd",
+    required: (values) =>
+      !values.naoClassificado && values.corEtiqueta === "LARANJA",
+  },
+  {
+    key: "naoClassificado",
+    label: "Não classificado",
+    type: "checkbox",
+  },
+  {
+    key: "obraReferencia",
+    label: "É obra de referência",
+    type: "checkbox",
+  },
+  {
+    key: "tema",
+    label: "Tema",
+    type: "select",
+    optionsKey: "themes",
+    required: true,
+  },
+  {
+    key: "quantidade",
+    label: "Quantidade de Exemplares",
+    type: "number",
+    required: true,
+  },
 ];
 
 const COLOR_OPTIONS = [
@@ -35,10 +101,10 @@ const COLOR_OPTIONS = [
 
 const identificationForm = document.getElementById("identification-form");
 const nameInput = document.getElementById("responsavel");
-const cpfInput = document.getElementById("cpf");
+const cargoSelect = document.getElementById("cargo");
 const matriculaInput = document.getElementById("matricula");
 const nameError = document.getElementById("responsavel-error");
-const cpfError = document.getElementById("cpf-error");
+const cargoError = document.getElementById("cargo-error");
 const matriculaError = document.getElementById("matricula-error");
 const schoolHint = document.getElementById("escola-hint");
 const schoolSelect = document.getElementById("escola");
@@ -49,26 +115,131 @@ const submitSurveyButton = document.getElementById("submit-survey");
 const surveyFeedback = document.getElementById("survey-feedback");
 const schoolDialog = document.getElementById("school-change-dialog");
 const cancelSchoolChangeButton = document.getElementById("cancel-school-change");
-const confirmSchoolChangeButton = document.getElementById("confirm-school-change");
+const confirmSchoolChangeButton = document.getElementById(
+  "confirm-school-change"
+);
 const cddInfoButton = document.getElementById("cdd-info-button");
 const cddTooltip = document.getElementById("cdd-tooltip");
+const deleteRowDialog = document.getElementById("delete-row-dialog");
+const cancelDeleteRowButton = document.getElementById("cancel-delete-row");
+const confirmDeleteRowButton = document.getElementById("confirm-delete-row");
 
 const touchedFields = {
   name: false,
-  cpf: false,
+  cargo: false,
   matricula: false,
 };
 
 let currentSchool = "";
 let pendingSchool = null;
+let pendingDeleteRow = null;
 let cddTooltipPinned = false;
 let cddTooltipHovered = false;
-let isSubmitting = false;
+
+const isbnCache = new Map();
+const isbnLookupTimers = new WeakMap();
+
+let isSaving = false;
+
+function sanitizeText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function onlyDigits(value, maxLength) {
+  return value.replace(/\D/g, "").slice(0, maxLength);
+}
+
+function normalizeIsbn(value) {
+  return String(value ?? "")
+    .replace(/[^0-9Xx]/g, "")
+    .toUpperCase();
+}
+
+function formatSavedAt(timestamp) {
+  const date = new Date(Number(timestamp));
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const pad = (number) => String(number).padStart(2, "0");
+
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)} ${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`;
+}
+
+function generateRowId() {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  return `row-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getRowId(row) {
+  if (!row.dataset.rowId) {
+    row.dataset.rowId = generateRowId();
+  }
+
+  return row.dataset.rowId;
+}
+
+function getRowSnapshot(row) {
+  return JSON.stringify(getRowValues(row));
+}
+
+async function loadOptions() {
+  try {
+    const response = await fetch(OPTIONS_URL, { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    appOptions = {
+      schools:
+        Array.isArray(data.schools) && data.schools.length > 0
+          ? data.schools
+          : FALLBACK_OPTIONS.schools,
+      cdd:
+        Array.isArray(data.cdd) && data.cdd.length > 0
+          ? data.cdd
+          : FALLBACK_OPTIONS.cdd,
+      themes:
+        Array.isArray(data.themes) && data.themes.length > 0
+          ? data.themes
+          : FALLBACK_OPTIONS.themes,
+    };
+  } catch (error) {
+    console.warn(
+      "Não foi possível carregar data/options.json. Usando dados de exemplo.",
+      error
+    );
+    appOptions = { ...FALLBACK_OPTIONS };
+  }
+}
 
 function populateSchoolOptions() {
+  schoolSelect.replaceChildren();
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Selecione...";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  schoolSelect.append(placeholder);
+
   const fragment = document.createDocumentFragment();
 
-  schoolSelector().forEach((school) => {
+  appOptions.schools.forEach((school) => {
     const option = document.createElement("option");
     option.value = school;
     option.textContent = school;
@@ -78,16 +249,12 @@ function populateSchoolOptions() {
   schoolSelect.append(fragment);
 }
 
-function onlyDigits(value, maxLength) {
-  return value.replace(/\D/g, "").slice(0, maxLength);
-}
-
 function isValidName() {
-  return nameInput.value.trim().length > 0;
+  return sanitizeText(nameInput.value).length > 0;
 }
 
-function isValidCpf() {
-  return /^\d{11}$/.test(cpfInput.value);
+function isValidCargo() {
+  return cargoSelect.value !== "";
 }
 
 function isValidMatricula() {
@@ -103,11 +270,11 @@ function setFieldError(input, errorElement, isValid, showError) {
 
 function updateIdentificationState() {
   const nameValid = isValidName();
-  const cpfValid = isValidCpf();
+  const cargoValid = isValidCargo();
   const matriculaValid = isValidMatricula();
 
   setFieldError(nameInput, nameError, nameValid, touchedFields.name);
-  setFieldError(cpfInput, cpfError, cpfValid, touchedFields.cpf);
+  setFieldError(cargoSelect, cargoError, cargoValid, touchedFields.cargo);
   setFieldError(
     matriculaInput,
     matriculaError,
@@ -115,7 +282,7 @@ function updateIdentificationState() {
     touchedFields.matricula
   );
 
-  const formValid = nameValid && cpfValid && matriculaValid;
+  const formValid = nameValid && cargoValid && matriculaValid;
 
   schoolSelect.disabled = !formValid;
   schoolHint.hidden = formValid;
@@ -185,7 +352,41 @@ function createColorSelect(label) {
   return select;
 }
 
-function createInput(label, type) {
+function createSelect(label, options) {
+  const select = document.createElement("select");
+  select.className = "table-select";
+  select.setAttribute("aria-label", label);
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Selecione";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  select.append(placeholder);
+
+  options.forEach((item) => {
+    const option = document.createElement("option");
+    const value = typeof item === "string" ? item : item.value;
+    const text = typeof item === "string" ? item : item.label ?? item.value;
+    option.value = value;
+    option.textContent = text;
+    select.append(option);
+  });
+
+  return select;
+}
+
+function createCheckbox(label) {
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.className = "row-checkbox";
+  input.autocomplete = "off";
+  input.setAttribute("aria-label", label);
+
+  return input;
+}
+
+function createInput(label, type, column) {
   const input = document.createElement("input");
   input.type = type;
   input.autocomplete = "off";
@@ -195,6 +396,21 @@ function createInput(label, type) {
     input.min = "1";
     input.step = "1";
     input.inputMode = "numeric";
+  }
+
+  if (column?.isbn) {
+    input.maxLength = 20;
+  }
+
+  if (column?.sanitize) {
+    input.addEventListener("blur", () => {
+      const sanitized = sanitizeText(input.value);
+
+      if (sanitized !== input.value) {
+        input.value = sanitized;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
   }
 
   return input;
@@ -216,96 +432,144 @@ function createDeleteButton() {
   return button;
 }
 
-function createBookRow(values = {}) {
-  const row = document.createElement("tr");
+function getOptionsForColumn(column) {
+  if (!column.optionsKey) {
+    return [];
+  }
+
+  return Array.isArray(appOptions[column.optionsKey])
+    ? appOptions[column.optionsKey]
+    : [];
+}
+
+function getRowControl(row, key) {
+  return row.querySelector(`[data-column-key="${key}"]`);
+}
+
+function getRowControlMap(row) {
+  const controls = {};
 
   COLUMNS.forEach((column) => {
-    const cell = document.createElement("td");
-    const control =
-      column.type === "color"
-        ? createColorSelect(column.label)
-        : createInput(column.label, column.type);
-
-    if (values[column.key] !== undefined && values[column.key] !== null) {
-      control.value = String(values[column.key]);
-    }
-
-    if (column.type === "color") {
-      applyColorStyle(control);
-    }
-
-    cell.append(control);
-    row.append(cell);
+    controls[column.key] = getRowControl(row, column.key);
   });
 
-  const actionCell = document.createElement("td");
-  actionCell.className = "row-actions";
-  actionCell.append(createDeleteButton());
-  row.append(actionCell);
-
-  return row;
+  return controls;
 }
 
-function appendRows(count) {
-  const fragment = document.createDocumentFragment();
-
-  for (let index = 0; index < count; index += 1) {
-    fragment.append(createBookRow());
+function getControlValue(control, type) {
+  if (!control) {
+    return type === "checkbox" ? false : "";
   }
 
-  booksBody.append(fragment);
+  return type === "checkbox" ? control.checked : control.value;
 }
 
-function renderBookTable(rows) {
-  booksBody.replaceChildren();
-
-  if (Array.isArray(rows) && rows.length > 0) {
-    rows.forEach((values) => booksBody.append(createBookRow(values)));
-  } else {
-    appendRows(10);
+function setControlValue(control, type, value) {
+  if (!control) {
+    return;
   }
 
-  bookSection.hidden = false;
-}
+  if (type === "checkbox") {
+    control.checked = Boolean(value);
+    return;
+  }
 
-function getRowControls(row) {
-  return Array.from(row.querySelectorAll("input, select"));
+  const stringValue = value === undefined || value === null ? "" : String(value);
+
+  if (
+    control.tagName === "SELECT" &&
+    stringValue !== "" &&
+    !Array.from(control.options).some((option) => option.value === stringValue)
+  ) {
+    const option = document.createElement("option");
+    option.value = stringValue;
+    option.textContent = stringValue;
+    control.append(option);
+  }
+
+  control.value = stringValue;
 }
 
 function getRowValues(row) {
-  const controls = getRowControls(row);
+  const controls = getRowControlMap(row);
   const values = {};
 
-  COLUMNS.forEach((column, index) => {
-    values[column.key] = controls[index]?.value ?? "";
+  COLUMNS.forEach((column) => {
+    values[column.key] = getControlValue(controls[column.key], column.type);
   });
 
   return values;
 }
 
-function getRowState(row) {
-  const values = getRowControls(row).map((control) => control.value.trim());
+function rowValuesAreEmpty(values) {
+  return !COLUMNS.some((column) => {
+    const value = values[column.key];
 
-  if (values.every((value) => value === "")) {
+    return column.type === "checkbox"
+      ? Boolean(value)
+      : String(value ?? "").trim() !== "";
+  });
+}
+
+function isColumnRequired(column, values) {
+  return typeof column.required === "function"
+    ? column.required(values)
+    : Boolean(column.required);
+}
+
+function isColumnValueValid(column, values) {
+  if (column.type === "checkbox") {
+    return true;
+  }
+
+  const value = String(values[column.key] ?? "").trim();
+
+  if (value === "") {
+    return !isColumnRequired(column, values);
+  }
+
+  if (column.isbn) {
+    return /^(\d{9}[\dX]|\d{13})$/.test(normalizeIsbn(value));
+  }
+
+  if (column.key === "quantidade") {
+    const quantity = Number(value);
+    return Number.isInteger(quantity) && quantity >= 1;
+  }
+
+  return true;
+}
+
+function getInvalidColumnKeys(values) {
+  return COLUMNS.filter((column) => !isColumnValueValid(column, values)).map(
+    (column) => column.key
+  );
+}
+
+function getRowState(row) {
+  const values = getRowValues(row);
+
+  if (rowValuesAreEmpty(values)) {
     return "empty";
   }
 
-  if (values.every((value) => value !== "")) {
-    return "complete";
-  }
-
-  return "partial";
+  return getInvalidColumnKeys(values).length === 0 ? "complete" : "partial";
 }
 
 function setRowFlag(row, flagged) {
+  const missingKeys = new Set(getInvalidColumnKeys(getRowValues(row)));
+
   row.classList.toggle("row-incomplete", flagged);
 
-  getRowControls(row).forEach((control) => {
-    if (flagged) {
-      control.setAttribute(
-        "aria-invalid",
-        String(control.value.trim() === "")
-      );
+  COLUMNS.forEach((column) => {
+    const control = getRowControl(row, column.key);
+
+    if (!control) {
+      return;
+    }
+
+    if (flagged && missingKeys.has(column.key)) {
+      control.setAttribute("aria-invalid", "true");
     } else {
       control.removeAttribute("aria-invalid");
     }
@@ -349,16 +613,215 @@ function hasTableData() {
   );
 }
 
+function updateRowSaveStatus(row) {
+  const status = row.querySelector(".save-status");
+
+  if (!status) {
+    return;
+  }
+
+  const values = getRowValues(row);
+
+  if (rowValuesAreEmpty(values)) {
+    status.textContent = "";
+    status.className = "save-status";
+    return;
+  }
+
+  const savedAt = Number(row.dataset.savedAt) || 0;
+  const savedSnapshot = row.dataset.savedSnapshot || "";
+  const currentSnapshot = JSON.stringify(values);
+  const hasError = row.dataset.saveError === "true";
+  const savedAtText = savedAt ? formatSavedAt(savedAt) : "";
+
+  if (hasError) {
+    status.textContent = savedAt
+      ? `Erro ao salvar, último salvamento em ${savedAtText}`
+      : "Erro ao salvar";
+    status.className = "save-status error";
+    return;
+  }
+
+  if (!savedAt) {
+    status.textContent = "Entrada não salva";
+    status.className = "save-status pending";
+    return;
+  }
+
+  if (currentSnapshot !== savedSnapshot) {
+    status.textContent = `Alterações pendentes. Último salvamento em ${savedAtText}`;
+    status.className = "save-status pending";
+    return;
+  }
+
+  status.textContent = `Salvo em ${savedAtText}`;
+  status.className = "save-status saved";
+}
+
+function updateAllRowSaveStatuses() {
+  booksBody.querySelectorAll("tr").forEach(updateRowSaveStatus);
+}
+
+function applyRowConditionalState(row) {
+  const values = getRowValues(row);
+  const controls = getRowControlMap(row);
+  const metadataEditable =
+    Boolean(values.semIsbn) || row.dataset.isbnLookupState === "failed";
+
+  ["titulo", "autor", "editora"].forEach((key) => {
+    if (controls[key]) {
+      controls[key].disabled = !metadataEditable;
+    }
+  });
+
+  if (controls.isbn) {
+    controls.isbn.disabled = Boolean(values.semIsbn);
+  }
+
+  if (controls.corEtiqueta) {
+    controls.corEtiqueta.disabled = Boolean(values.naoClassificado);
+  }
+
+  if (controls.cdd) {
+    controls.cdd.disabled = Boolean(values.naoClassificado);
+  }
+
+  COLUMNS.forEach((column) => {
+    const control = controls[column.key];
+
+    if (!control) {
+      return;
+    }
+
+    if (isColumnRequired(column, values)) {
+      control.setAttribute("aria-required", "true");
+    } else {
+      control.removeAttribute("aria-required");
+    }
+  });
+}
+
+function createBookRow(values = {}) {
+  const row = document.createElement("tr");
+  const meta =
+    values && typeof values._meta === "object" && values._meta
+      ? values._meta
+      : {};
+
+  row.dataset.rowId =
+    typeof meta.id === "string" && meta.id ? meta.id : generateRowId();
+  row.dataset.isbnLookupState = meta.isbnLookupState || "idle";
+
+  if (meta.savedAt) {
+    row.dataset.savedAt = String(meta.savedAt);
+  }
+
+  if (typeof meta.savedSnapshot === "string" && meta.savedSnapshot) {
+    row.dataset.savedSnapshot = meta.savedSnapshot;
+  }
+
+  if (meta.saveError) {
+    row.dataset.saveError = "true";
+  }
+
+  COLUMNS.forEach((column) => {
+    const cell = document.createElement("td");
+    let control;
+
+    if (column.type === "color") {
+      control = createColorSelect(column.label);
+    } else if (column.type === "checkbox") {
+      control = createCheckbox(column.label);
+      cell.classList.add("checkbox-cell");
+    } else if (column.type === "select") {
+      control = createSelect(column.label, getOptionsForColumn(column));
+    } else {
+      control = createInput(column.label, column.type, column);
+    }
+
+    control.dataset.columnKey = column.key;
+    setControlValue(control, column.type, values[column.key]);
+
+    if (column.type === "color") {
+      applyColorStyle(control);
+    }
+
+    cell.append(control);
+    row.append(cell);
+  });
+
+  const actionCell = document.createElement("td");
+  actionCell.className = "row-actions";
+  actionCell.append(createDeleteButton());
+  row.append(actionCell);
+
+  const statusCell = document.createElement("td");
+  statusCell.className = "save-status-cell";
+  const status = document.createElement("span");
+  status.className = "save-status";
+  statusCell.append(status);
+  row.append(statusCell);
+
+  const controls = getRowControlMap(row);
+
+  if (values.semIsbn) {
+    setControlValue(controls.isbn, "text", "");
+  }
+
+  if (values.naoClassificado) {
+    setControlValue(controls.corEtiqueta, "color", "");
+    applyColorStyle(controls.corEtiqueta);
+    setControlValue(controls.cdd, "select", "");
+  }
+
+  row.dataset.lastIsbn = normalizeIsbn(controls.isbn?.value ?? "");
+  applyRowConditionalState(row);
+  updateRowSaveStatus(row);
+
+  return row;
+}
+
+function appendRows(count) {
+  const fragment = document.createDocumentFragment();
+
+  for (let index = 0; index < count; index += 1) {
+    fragment.append(createBookRow());
+  }
+
+  booksBody.append(fragment);
+}
+
+function renderBookTable(rows) {
+  booksBody.replaceChildren();
+
+  if (Array.isArray(rows) && rows.length > 0) {
+    rows.forEach((values) => booksBody.append(createBookRow(values)));
+  } else {
+    appendRows(10);
+  }
+
+  bookSection.hidden = false;
+}
+
 function saveState() {
   const state = {
-    version: 1,
+    version: DRAFT_VERSION,
     form: {
       responsavel: nameInput.value,
-      cpf: cpfInput.value,
+      cargo: cargoSelect.value,
       matricula: matriculaInput.value,
     },
     school: currentSchool,
-    rows: Array.from(booksBody.querySelectorAll("tr")).map(getRowValues),
+    rows: Array.from(booksBody.querySelectorAll("tr")).map((row) => ({
+      ...getRowValues(row),
+      _meta: {
+        id: getRowId(row),
+        savedAt: row.dataset.savedAt || null,
+        savedSnapshot: row.dataset.savedSnapshot || null,
+        saveError: row.dataset.saveError === "true",
+        isbnLookupState: row.dataset.isbnLookupState || "idle",
+      },
+    })),
   };
 
   try {
@@ -385,24 +848,39 @@ function restoreState() {
   }
 
   const form = state.form && typeof state.form === "object" ? state.form : {};
-  nameInput.value =
-    typeof form.responsavel === "string" ? form.responsavel : "";
-  cpfInput.value = onlyDigits(String(form.cpf ?? ""), 11);
+  nameInput.value = sanitizeText(
+    typeof form.responsavel === "string" ? form.responsavel : ""
+  );
+
+  const savedCargo = typeof form.cargo === "string" ? form.cargo : "";
+  const cargoExists = Array.from(cargoSelect.options).some(
+    (option) => option.value !== "" && option.value === savedCargo
+  );
+  cargoSelect.value = cargoExists ? savedCargo : "";
+
   matriculaInput.value = onlyDigits(String(form.matricula ?? ""), 5);
 
   const savedSchool = typeof state.school === "string" ? state.school : "";
-  const schoolExists = Array.from(schoolSelect.options).some(
-    (option) => option.value !== "" && option.value === savedSchool
-  );
 
-  if (schoolExists) {
+  if (savedSchool) {
+    if (
+      !Array.from(schoolSelect.options).some(
+        (option) => option.value === savedSchool
+      )
+    ) {
+      const option = document.createElement("option");
+      option.value = savedSchool;
+      option.textContent = savedSchool;
+      schoolSelect.append(option);
+    }
+
     currentSchool = savedSchool;
     schoolSelect.value = savedSchool;
   }
 
   const rows = Array.isArray(state.rows) ? state.rows : [];
 
-  if (schoolExists || rows.length > 0) {
+  if (savedSchool || rows.length > 0) {
     renderBookTable(rows);
   }
 }
@@ -413,8 +891,8 @@ function handleNameInput() {
   saveState();
 }
 
-function handleCpfInput() {
-  cpfInput.value = onlyDigits(cpfInput.value, 11);
+function handleCargoChange() {
+  touchedFields.cargo = true;
   updateIdentificationState();
   hideFeedbackOnDataChange();
   saveState();
@@ -427,34 +905,273 @@ function handleMatriculaInput() {
   saveState();
 }
 
-function handleTableChange(event) {
-  if (!hasEmptyRow()) {
-    appendRows(1);
+function clearIsbnLookupTimer(row) {
+  const timer = isbnLookupTimers.get(row);
+
+  if (timer) {
+    clearTimeout(timer);
+    isbnLookupTimers.delete(row);
   }
 
-  const row = event.target.closest("tr");
+  const isbnInput = getRowControl(row, "isbn");
 
-  if (row) {
-    refreshFlaggedRow(row);
+  if (isbnInput) {
+    isbnInput.removeAttribute("aria-busy");
   }
-
-  hideFeedbackOnDataChange();
-  saveState();
 }
 
-function handleTableClick(event) {
-  const deleteButton = event.target.closest(".delete-row-button");
+function scheduleIsbnLookup(row) {
+  clearIsbnLookupTimer(row);
 
-  if (!deleteButton) {
+  const values = getRowValues(row);
+  const isbnInput = getRowControl(row, "isbn");
+  const isbn = normalizeIsbn(isbnInput?.value ?? "");
+
+  if (values.semIsbn || isbn === "") {
+    row.dataset.isbnLookupState = "idle";
+    applyRowConditionalState(row);
     return;
   }
 
-  const row = deleteButton.closest("tr");
+  if (!/^(\d{9}[\dX]|\d{13})$/.test(isbn)) {
+    row.dataset.isbnLookupState = "idle";
+    applyRowConditionalState(row);
+    return;
+  }
+
+  row.dataset.isbnLookupState = "loading";
+  isbnInput.setAttribute("aria-busy", "true");
+  applyRowConditionalState(row);
+
+  const timer = setTimeout(() => {
+    isbnLookupTimers.delete(row);
+    lookupIsbn(row, isbn);
+  }, ISBN_LOOKUP_DEBOUNCE_MS);
+
+  isbnLookupTimers.set(row, timer);
+}
+
+async function lookupIsbn(row, isbn) {
+  if (!row.isConnected || getRowValues(row).semIsbn) {
+    return;
+  }
+
+  const currentIsbn = normalizeIsbn(getRowControl(row, "isbn")?.value ?? "");
+
+  if (currentIsbn !== isbn) {
+    return;
+  }
+
+  try {
+    let metadata = isbnCache.get(isbn);
+
+    if (!metadata) {
+      const response = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(
+          isbn
+        )}`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          response.status === 429
+            ? "limite de consultas à API de ISBN atingido"
+            : "falha na consulta do ISBN"
+        );
+      }
+
+      const data = await response.json();
+      const volume = data.items?.[0]?.volumeInfo;
+
+      if (!volume) {
+        throw new Error("ISBN não encontrado");
+      }
+
+      metadata = {
+        titulo: sanitizeText(volume.title || ""),
+        autor: sanitizeText(
+          Array.isArray(volume.authors) ? volume.authors.join(", ") : ""
+        ),
+        editora: String(volume.publisher || "").trim(),
+      };
+
+      isbnCache.set(isbn, metadata);
+    }
+
+    if (
+      !row.isConnected ||
+      getRowValues(row).semIsbn ||
+      normalizeIsbn(getRowControl(row, "isbn")?.value ?? "") !== isbn
+    ) {
+      return;
+    }
+
+    const controls = getRowControlMap(row);
+
+    if (metadata.titulo) {
+      setControlValue(controls.titulo, "text", metadata.titulo);
+    }
+
+    if (metadata.autor) {
+      setControlValue(controls.autor, "text", metadata.autor);
+    }
+
+    if (metadata.editora) {
+      setControlValue(controls.editora, "text", metadata.editora);
+    }
+
+    const hasCompleteMetadata =
+      Boolean(metadata.titulo) &&
+      Boolean(metadata.autor) &&
+      Boolean(metadata.editora);
+
+    row.dataset.isbnLookupState = hasCompleteMetadata ? "success" : "failed";
+    applyRowConditionalState(row);
+    updateRowSaveStatus(row);
+    refreshFlaggedRow(row);
+
+    if (!hasCompleteMetadata) {
+      showFeedback(
+        `A API do ISBN ${isbn} retornou dados incompletos. Preencha os campos restantes manualmente.`,
+        "error",
+        "isbn"
+      );
+    }
+
+    saveState();
+  } catch (error) {
+    if (
+      !row.isConnected ||
+      normalizeIsbn(getRowControl(row, "isbn")?.value ?? "") !== isbn
+    ) {
+      return;
+    }
+
+    row.dataset.isbnLookupState = "failed";
+    applyRowConditionalState(row);
+    updateRowSaveStatus(row);
+
+    const message =
+      error instanceof Error ? error.message : "erro inesperado na consulta";
+
+    showFeedback(
+      `Não foi possível buscar os dados do ISBN ${isbn}: ${message}. Preencha os dados manualmente.`,
+      "error",
+      "isbn"
+    );
+
+    saveState();
+  } finally {
+    if (row.isConnected) {
+      getRowControl(row, "isbn")?.removeAttribute("aria-busy");
+    }
+  }
+}
+
+function handleIsbnChange(row) {
+  const isbnInput = getRowControl(row, "isbn");
+  const isbn = normalizeIsbn(isbnInput?.value ?? "");
+
+  if (row.dataset.lastIsbn === isbn) {
+    return;
+  }
+
+  row.dataset.lastIsbn = isbn;
+  row.dataset.isbnLookupState = "idle";
+  scheduleIsbnLookup(row);
+}
+
+function handleSemIsbnChange(row) {
+  const values = getRowValues(row);
+  const controls = getRowControlMap(row);
+
+  clearIsbnLookupTimer(row);
+
+  if (values.semIsbn) {
+    setControlValue(controls.isbn, "text", "");
+    delete row.dataset.lastIsbn;
+    row.dataset.isbnLookupState = "manual";
+  } else {
+    row.dataset.isbnLookupState = "idle";
+  }
+
+  applyRowConditionalState(row);
+}
+
+function handleUnclassifiedChange(row) {
+  const values = getRowValues(row);
+  const controls = getRowControlMap(row);
+
+  if (values.naoClassificado) {
+    setControlValue(controls.corEtiqueta, "color", "");
+    applyColorStyle(controls.corEtiqueta);
+    setControlValue(controls.cdd, "select", "");
+  }
+
+  applyRowConditionalState(row);
+}
+
+function handleTableChange(event) {
+  const target = event.target;
+
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  const row = target.closest("tr");
 
   if (!row) {
     return;
   }
 
+  const columnKey = target.dataset.columnKey;
+
+  if (columnKey === "semIsbn") {
+    handleSemIsbnChange(row);
+  }
+
+  if (columnKey === "naoClassificado") {
+    handleUnclassifiedChange(row);
+  }
+
+  if (columnKey === "corEtiqueta") {
+    applyColorStyle(target);
+  }
+
+  if (columnKey === "isbn") {
+    handleIsbnChange(row);
+  }
+
+  applyRowConditionalState(row);
+  updateRowSaveStatus(row);
+
+  if (!hasEmptyRow()) {
+    appendRows(1);
+  }
+
+  refreshFlaggedRow(row);
+  hideFeedbackOnDataChange();
+  saveState();
+}
+
+function notifySavedRowDeletion(row) {
+  if (!Number(row.dataset.savedAt)) {
+    return;
+  }
+
+  const rowPayload = {
+    rowId: getRowId(row),
+    ...getRowValues(row),
+  };
+
+  void deleteBookRow(rowPayload).catch((error) => {
+    console.error("Falha ao notificar a exclusão da linha.", error);
+  });
+}
+
+function removeRow(row) {
+  notifySavedRowDeletion(row);
+  clearIsbnLookupTimer(row);
   row.remove();
 
   if (!booksBody.querySelector("tr")) {
@@ -471,6 +1188,54 @@ function handleTableClick(event) {
   }
 
   saveState();
+}
+
+function handleTableClick(event) {
+  const target = event.target;
+
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  const deleteButton = target.closest(".delete-row-button");
+
+  if (!deleteButton) {
+    return;
+  }
+
+  const row = deleteButton.closest("tr");
+
+  if (!row) {
+    return;
+  }
+
+  if (rowIsEmpty(row)) {
+    removeRow(row);
+    return;
+  }
+
+  pendingDeleteRow = row;
+
+  if (!deleteRowDialog.open) {
+    deleteRowDialog.showModal();
+  }
+}
+
+function cancelDeleteRow() {
+  pendingDeleteRow = null;
+  deleteRowDialog.close();
+}
+
+function confirmDeleteRow() {
+  const row = pendingDeleteRow;
+  pendingDeleteRow = null;
+  deleteRowDialog.close();
+
+  if (!row || !row.isConnected) {
+    return;
+  }
+
+  removeRow(row);
 }
 
 function handleAddRows() {
@@ -530,37 +1295,154 @@ function formatRowNumbers(rowNumbers) {
   return `${rowNumbers.slice(0, -1).join(", ")} e ${rowNumbers.at(-1)}`;
 }
 
+function sanitizeAllTextFields() {
+  nameInput.value = sanitizeText(nameInput.value);
+
+  booksBody
+    .querySelectorAll('[data-column-key="titulo"], [data-column-key="autor"]')
+    .forEach((input) => {
+      input.value = sanitizeText(input.value);
+    });
+}
+
 function buildSurveyPayload(rows) {
   return {
-    responsavel: nameInput.value.trim(),
-    cpf: cpfInput.value,
+    responsavel: sanitizeText(nameInput.value),
+    cargo: cargoSelect.value,
     matricula: matriculaInput.value,
     escola: currentSchool,
     livros: rows.map((row) => {
       const values = getRowValues(row);
 
       return {
-        titulo: values.titulo.trim(),
-        autor: values.autor.trim(),
-        isbn: values.isbn.trim(),
+        titulo: values.titulo,
+        autor: values.autor,
+        editora: values.editora,
+        isbn: normalizeIsbn(values.isbn),
+        semIsbn: values.semIsbn,
         corEtiqueta: values.corEtiqueta,
-        cdd: values.cdd.trim(),
+        cdd: values.cdd,
+        naoClassificado: values.naoClassificado,
+        obraReferencia: values.obraReferencia,
+        tema: values.tema,
         quantidade: Number(values.quantidade),
       };
     }),
   };
 }
 
-async function handleSubmitSurvey() {
-  if (isSubmitting) {
+function setSaveButtonState(inProgress) {
+  submitSurveyButton.disabled = inProgress;
+  submitSurveyButton.textContent = inProgress
+    ? SAVE_IN_PROGRESS_LABEL
+    : SAVE_LABEL;
+}
+
+function markRowsWithSaveError() {
+  booksBody.querySelectorAll("tr").forEach((row) => {
+    if (!rowIsEmpty(row)) {
+      row.dataset.saveError = "true";
+      updateRowSaveStatus(row);
+    }
+  });
+}
+
+function handleSaveSuccess(rowSnapshots) {
+  const savedAt = Date.now();
+
+  booksBody.querySelectorAll("tr").forEach((row) => {
+    delete row.dataset.saveError;
+
+    if (rowIsEmpty(row)) {
+      updateRowSaveStatus(row);
+      return;
+    }
+
+    const sentSnapshot = rowSnapshots.get(getRowId(row));
+    const currentSnapshot = getRowSnapshot(row);
+
+    if (sentSnapshot && sentSnapshot === currentSnapshot) {
+      row.dataset.savedAt = String(savedAt);
+      row.dataset.savedSnapshot = currentSnapshot;
+    }
+
+    updateRowSaveStatus(row);
+  });
+
+  showFeedback("Levantamento salvo com sucesso.", "success", "saved");
+  saveState();
+}
+
+function handleSaveFailure(error, payload) {
+  const message =
+    error instanceof Error ? error.message : "erro inesperado ao salvar";
+
+  markRowsWithSaveError();
+  showFeedback(
+    `Não foi possível salvar o levantamento: ${message}`,
+    "error",
+    "submit"
+  );
+  showSaveErrorDialog(message);
+  scheduleSaveRetry(payload, 1);
+  saveState();
+}
+
+async function saveSurvey(payload, rowSnapshots) {
+  isSaving = true;
+  setSaveButtonState(true);
+
+  try {
+    const result = await sendSurveyToBackend(payload);
+
+    if (result?.success === false) {
+      throw new Error(
+        result.message || "Não foi possível salvar o levantamento."
+      );
+    }
+
+    handleSaveSuccess(rowSnapshots);
+  } catch (error) {
+    handleSaveFailure(error, payload);
+  } finally {
+    isSaving = false;
+    setSaveButtonState(false);
+  }
+}
+
+function showSaveErrorDialog(errorMessage) {
+  // TODO: open #save-error-dialog and display the failure message.
+  // TODO: tell the user the current changes are saved in this browser and are not lost.
+  // TODO: show the number of retries and a countdown to the next automatic retry.
+  // TODO: wire #cancel-save-retry to cancel the pending retry.
+  void errorMessage;
+}
+
+function scheduleSaveRetry(payload, attempt = 0) {
+  // TODO: implement rolling retry with exponential backoff (1, 2, 4, 8, 16, 32, 60s).
+  // TODO: add random jitter to each delay to avoid overloading the server.
+  // TODO: stop after ~60s and show the final error with a request to try again later.
+  // TODO: call sendSurveyToBackend again with the same payload.
+  void payload;
+  void attempt;
+}
+
+function cancelSaveRetry() {
+  // TODO: clear the pending retry timer and close #save-error-dialog.
+}
+
+function handleSave() {
+  if (isSaving) {
     return;
   }
 
+  sanitizeAllTextFields();
+  updateAllRowSaveStatuses();
   clearAllRowFlags();
   hideFeedback();
 
   touchedFields.name = true;
-  touchedFields.cpf = true;
+  touchedFields.cargo = true;
   touchedFields.matricula = true;
   updateIdentificationState();
 
@@ -579,9 +1461,9 @@ async function handleSubmitSurvey() {
     }
   });
 
-  if (!isValidName() || !isValidCpf() || !isValidMatricula()) {
+  if (!isValidName() || !isValidCargo() || !isValidMatricula()) {
     showFeedback(
-      "Preencha corretamente o nome, o CPF e a matrícula antes de enviar.",
+      "Preencha corretamente o nome, o cargo e a matrícula antes de salvar.",
       "error",
       "submit"
     );
@@ -592,7 +1474,7 @@ async function handleSubmitSurvey() {
     showFeedback(
       `Linhas parcialmente preenchidas: ${formatRowNumbers(
         partialRowNumbers
-      )}. Preencha todos os campos ou exclua essas linhas.`,
+      )}. Preencha todos os campos obrigatórios ou exclua essas linhas.`,
       "error",
       "incomplete"
     );
@@ -604,7 +1486,7 @@ async function handleSubmitSurvey() {
 
   if (!currentSchool) {
     showFeedback(
-      "Selecione uma EMEB antes de enviar o levantamento.",
+      "Selecione uma EMEB antes de salvar o levantamento.",
       "error",
       "submit"
     );
@@ -613,7 +1495,7 @@ async function handleSubmitSurvey() {
 
   if (completeRows.length === 0) {
     showFeedback(
-      "Preencha ao menos uma linha de livro antes de enviar.",
+      "Preencha ao menos uma linha de livro antes de salvar.",
       "error",
       "submit"
     );
@@ -621,39 +1503,32 @@ async function handleSubmitSurvey() {
   }
 
   const payload = buildSurveyPayload(completeRows);
+  const rowSnapshots = new Map(
+    completeRows.map((row) => [getRowId(row), getRowSnapshot(row)])
+  );
 
-  isSubmitting = true;
-  submitSurveyButton.disabled = true;
-  submitSurveyButton.textContent = "Enviando...";
+  saveState();
+  saveSurvey(payload, rowSnapshots);
+}
 
-  try {
-    const result = await submitSurvey(payload);
+async function sendSurveyToBackend(payload, options = {}) {
+  // TODO: replace this stub with the real backend call.
+  // TODO: send `payload` as JSON to the Apps Script/Google Sites endpoint.
+  // TODO: use options.signal to cancel in-flight requests.
+  // TODO: map HTTP/network failures to thrown errors or { success: false, message }.
+  void payload;
+  void options;
 
-    if (result?.success === false) {
-      throw new Error(
-        result.message || "Não foi possível enviar o levantamento."
-      );
-    }
+  return { success: true };
+}
 
-    showFeedback(
-      "Levantamento de livros enviado com sucesso.",
-      "success",
-      "sent"
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Erro inesperado no envio.";
+async function deleteBookRow(book) {
+  // TODO: notify the backend that a saved row was deleted.
+  // TODO: define whether deletion is permanent or a stale/deleted marker.
+  // TODO: include the backend row id once rows are persisted server-side.
+  void book;
 
-    showFeedback(
-      `Não foi possível enviar o levantamento: ${message}`,
-      "error",
-      "submit"
-    );
-  } finally {
-    isSubmitting = false;
-    submitSurveyButton.disabled = false;
-    submitSurveyButton.textContent = SUBMIT_LABEL;
-  }
+  return { success: true };
 }
 
 function positionCddTooltip() {
@@ -694,15 +1569,13 @@ function hideCddTooltip(force = false) {
 
 nameInput.addEventListener("input", handleNameInput);
 nameInput.addEventListener("blur", () => {
+  nameInput.value = sanitizeText(nameInput.value);
   touchedFields.name = true;
   updateIdentificationState();
+  saveState();
 });
 
-cpfInput.addEventListener("input", handleCpfInput);
-cpfInput.addEventListener("blur", () => {
-  touchedFields.cpf = true;
-  updateIdentificationState();
-});
+cargoSelect.addEventListener("change", handleCargoChange);
 
 matriculaInput.addEventListener("input", handleMatriculaInput);
 matriculaInput.addEventListener("blur", () => {
@@ -718,15 +1591,21 @@ booksBody.addEventListener("input", handleTableChange);
 booksBody.addEventListener("change", handleTableChange);
 booksBody.addEventListener("click", handleTableClick);
 addRowsButton.addEventListener("click", handleAddRows);
-submitSurveyButton.addEventListener("click", handleSubmitSurvey);
+submitSurveyButton.addEventListener("click", handleSave);
 cancelSchoolChangeButton.addEventListener("click", cancelSchoolChange);
 confirmSchoolChangeButton.addEventListener("click", confirmSchoolChange);
+cancelDeleteRowButton.addEventListener("click", cancelDeleteRow);
+confirmDeleteRowButton.addEventListener("click", confirmDeleteRow);
 
 schoolDialog.addEventListener("close", () => {
   if (pendingSchool !== null) {
     pendingSchool = null;
     schoolSelect.value = currentSchool;
   }
+});
+
+deleteRowDialog.addEventListener("close", () => {
+  pendingDeleteRow = null;
 });
 
 cddInfoButton.addEventListener("pointerenter", (event) => {
@@ -743,6 +1622,14 @@ cddInfoButton.addEventListener("pointerleave", (event) => {
   }
 
   cddTooltipHovered = false;
+
+  if (
+    event.relatedTarget instanceof Node &&
+    cddTooltip.contains(event.relatedTarget)
+  ) {
+    return;
+  }
+
   hideCddTooltip();
 });
 cddInfoButton.addEventListener("click", () => {
@@ -754,13 +1641,32 @@ cddInfoButton.addEventListener("click", () => {
     hideCddTooltip();
   }
 });
-cddInfoButton.addEventListener("blur", () => {
+cddInfoButton.addEventListener("blur", (event) => {
+  if (
+    event.relatedTarget instanceof Node &&
+    cddTooltip.contains(event.relatedTarget)
+  ) {
+    return;
+  }
+
   cddTooltipPinned = false;
   hideCddTooltip();
 });
 
+cddTooltip.addEventListener("pointerenter", () => {
+  cddTooltipHovered = true;
+});
+cddTooltip.addEventListener("pointerleave", () => {
+  cddTooltipHovered = false;
+  hideCddTooltip();
+});
+
 document.addEventListener("click", (event) => {
-  if (cddTooltip.hidden || cddInfoButton.contains(event.target)) {
+  if (
+    cddTooltip.hidden ||
+    cddInfoButton.contains(event.target) ||
+    cddTooltip.contains(event.target)
+  ) {
     return;
   }
 
@@ -794,6 +1700,11 @@ document.addEventListener(
   true
 );
 
-populateSchoolOptions();
-restoreState();
-updateIdentificationState();
+async function init() {
+  await loadOptions();
+  populateSchoolOptions();
+  restoreState();
+  updateIdentificationState();
+}
+
+init();

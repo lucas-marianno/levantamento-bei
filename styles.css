@@ -180,12 +180,14 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.18);
 }
 
-input[aria-invalid="true"] {
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
   background: var(--error-bg);
   border-color: var(--brand-orange);
 }
 
-input[aria-invalid="true"]:focus {
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus {
   border-color: var(--brand-orange-dark);
   box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.2);
 }
@@ -235,7 +237,7 @@ select:disabled:hover {
 
 table {
   width: 100%;
-  min-width: 1060px;
+  min-width: 1680px;
   border-collapse: separate;
   border-spacing: 0;
   background: var(--surface);
@@ -243,6 +245,10 @@ table {
 
 .row-actions-header {
   width: 54px;
+}
+
+.save-status-header {
+  width: 240px;
 }
 
 thead th {
@@ -362,6 +368,63 @@ td.row-actions {
   height: 16px;
 }
 
+.checkbox-cell {
+  text-align: center;
+}
+
+td input[type="checkbox"].row-checkbox {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--brand-blue);
+  cursor: pointer;
+}
+
+td input[type="checkbox"].row-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.3);
+}
+
+.save-status-cell {
+  width: 240px;
+  padding: 9px 10px;
+}
+
+.save-status {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.save-status.saved {
+  color: #0b5a27;
+}
+
+.save-status.pending {
+  color: #8a5a00;
+}
+
+.save-status.error {
+  color: var(--brand-orange-dark);
+}
+
+td input:disabled,
+td select:disabled {
+  color: #64748b;
+  background: #eef2f7;
+  border-color: transparent;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+td input[aria-busy="true"] {
+  background: var(--brand-blue-soft);
+}
+
 td input,
 td select {
   min-width: 0;
@@ -421,6 +484,12 @@ td input[type="number"] {
   color: #8a3600;
   background: #fff1e6;
   border-color: #f4c39f;
+}
+
+.feedback.info {
+  color: var(--brand-blue-dark);
+  background: var(--brand-blue-soft);
+  border-color: #b9cae8;
 }
 
 .btn {
@@ -491,7 +560,7 @@ td input[type="number"] {
 .tooltip {
   position: fixed;
   z-index: 100;
-  max-width: 240px;
+  max-width: 260px;
   padding: 9px 12px;
   color: #ffffff;
   background: var(--ink);
@@ -499,7 +568,19 @@ td input[type="number"] {
   box-shadow: 0 12px 30px rgba(24, 36, 61, 0.28);
   font-size: 0.84rem;
   font-weight: 500;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.tooltip a {
+  color: var(--brand-yellow);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tooltip a:hover,
+.tooltip a:focus-visible {
+  color: #ffffff;
 }
 
 .warning-dialog {
@@ -552,6 +633,31 @@ td input[type="number"] {
   margin-top: 8px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.save-error-dialog {
+  border-top-color: var(--brand-orange-dark);
+}
+
+.retry-details {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: #fff1e6;
+  border: 1px solid #f4c39f;
+  border-radius: 10px;
+}
+
+.retry-details p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.retry-details p + p {
+  margin-top: 6px;
+}
+
+.retry-details strong {
+  color: var(--brand-orange-dark);
 }
 
 .dialog-actions {

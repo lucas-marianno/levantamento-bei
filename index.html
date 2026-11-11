@@ -44,19 +44,22 @@
 
         <div class="field-row">
           <div class="field">
-            <label for="cpf">CPF</label>
-            <input
-              type="text"
-              id="cpf"
-              name="cpf"
-              inputmode="numeric"
-              pattern="[0-9]{11}"
-              placeholder="Digite os 11 dígitos"
+            <label for="cargo">Cargo</label>
+            <select
+              id="cargo"
+              name="cargo"
               aria-required="true"
-              aria-describedby="cpf-error"
+              aria-describedby="cargo-error"
             >
-            <p class="field-error" id="cpf-error" hidden>
-              O CPF deve conter 11 dígitos.
+              <option value="" selected disabled>Selecione...</option>
+              <option value="Oficial de Escola">Oficial de Escola</option>
+              <option value="Funcionário Readaptado">Funcionário Readaptado</option>
+              <option value="Diretor">Diretor</option>
+              <option value="Vice-diretor">Vice-diretor</option>
+              <option value="Coordenador">Coordenador</option>
+            </select>
+            <p class="field-error" id="cargo-error" hidden>
+              Selecione o cargo.
             </p>
           </div>
 
@@ -89,7 +92,7 @@
             <option value="" selected disabled>Selecione...</option>
           </select>
           <p class="field-hint" id="escola-hint">
-            Preencha o nome, o CPF e a matrícula para selecionar a EMEB.
+            Preencha o nome, o cargo e a matrícula para selecionar a EMEB.
           </p>
         </div>
       </form>
@@ -104,7 +107,9 @@
             <tr>
               <th scope="col">Título do Livro</th>
               <th scope="col">Autor</th>
+              <th scope="col">Editora</th>
               <th scope="col">ISBN</th>
+              <th scope="col">Não possui ISBN</th>
               <th scope="col">Cor da Etiqueta</th>
               <th scope="col">
                 <span class="header-label">
@@ -122,10 +127,14 @@
                   </button>
                 </span>
               </th>
+              <th scope="col">Não classificado</th>
+              <th scope="col">É obra de referência</th>
+              <th scope="col">Tema</th>
               <th scope="col">Quantidade de Exemplares</th>
               <th scope="col" class="row-actions-header">
                 <span class="sr-only">Ações</span>
               </th>
+              <th scope="col" class="save-status-header">Status de salvamento</th>
             </tr>
           </thead>
           <tbody id="books-body"></tbody>
@@ -137,7 +146,7 @@
           Adicionar 10 linhas
         </button>
         <button type="button" id="submit-survey" class="btn btn-primary">
-          Enviar Levantamento de Livros
+          Salvar
         </button>
       </div>
 
@@ -176,8 +185,78 @@
     </div>
   </dialog>
 
+  <dialog
+    id="delete-row-dialog"
+    class="warning-dialog"
+    aria-labelledby="delete-row-title"
+    aria-describedby="delete-row-description"
+  >
+    <div class="warning-content">
+      <div class="warning-icon" aria-hidden="true">!</div>
+      <h2 id="delete-row-title">Excluir livro?</h2>
+      <p id="delete-row-description">
+        A linha selecionada será removida da tabela.
+      </p>
+      <p class="warning-note">
+        Se a linha já foi salva, o servidor será notificado da exclusão.
+      </p>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancel-delete-row" class="btn btn-secondary">
+          Cancelar
+        </button>
+        <button type="button" id="confirm-delete-row" class="btn btn-danger">
+          Excluir
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- TODO: wire this dialog to the retry flow when the backend is available. -->
+  <dialog
+    id="save-error-dialog"
+    class="warning-dialog save-error-dialog"
+    aria-labelledby="save-error-title"
+    aria-describedby="save-error-description"
+  >
+    <div class="warning-content">
+      <div class="warning-icon" aria-hidden="true">!</div>
+      <h2 id="save-error-title">Não foi possível salvar</h2>
+      <p id="save-error-description">
+        Ocorreu um erro ao salvar o levantamento.
+      </p>
+      <p class="warning-note" id="save-error-local-note">
+        Suas alterações estão salvas neste navegador e não serão perdidas.
+      </p>
+
+      <div class="retry-details" id="save-retry-details">
+        <p>Tentativas de reenvio: <strong id="save-retry-count">0</strong></p>
+        <p>
+          Próxima tentativa automática em
+          <strong id="save-retry-countdown">--</strong>.
+        </p>
+      </div>
+
+      <p class="warning-note" id="save-error-final-message" hidden>
+        Tente novamente mais tarde.
+      </p>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancel-save-retry" class="btn btn-secondary">
+          Cancelar envio
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="cdd-tooltip" class="tooltip" role="tooltip" hidden>
-    Classificação Decimal de Dewey
+    Classificação Decimal de Dewey. Consulte os códigos de referência nas páginas
+    112–130 do
+    <a
+      href="https://educacao.saobernardo.sp.gov.br/images/bei/Guia_de_Gerenciamento_da_BEI_2026_07072026.pdf"
+      target="_blank"
+      rel="noopener noreferrer"
+    >Guia de Gerenciamento da BEI 2026</a>.
   </div>
 
   <script src="script.js"></script>

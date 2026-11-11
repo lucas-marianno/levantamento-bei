@@ -1,0 +1,21 @@
+{
+  "_comment": "Substitua os itens de exemplo pelas listas oficiais quando estiverem disponíveis.",
+  "schools": [
+    "EMEB Exemplo 1",
+    "EMEB Exemplo 2"
+  ],
+  "cdd": [
+    {
+      "value": "000",
+      "label": "000 - Generalidades"
+    },
+    {
+      "value": "010",
+      "label": "010 - Bibliografia"
+    }
+  ],
+  "themes": [
+    "Tema Exemplo 1",
+    "Tema Exemplo 2"
+  ]
+}
