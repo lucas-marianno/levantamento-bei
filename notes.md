@@ -2,6 +2,18 @@
 # TODO
 [] replace CPF with cargo
 [] modify the existing fields for as documented bellow
+[] rename btn "Enviar levantamento de Livros" to "Salvar"
+- Everytime its clicked, calls the funtion to send the current changed to the backend. (for the moment, only create the function stubs with a TODO list inside them)
+  - Implement a rolling retry with a exponential retry time (1-2-4-8-16-32-64...) 
+    - use a randomizer to add/remove ms to the wait time and avoid overloading the server
+    - retry up to ~1min delay, after that, inform the user that he should retry it later and display the error message
+  - Draw a popup to inform the user about the error:
+    - that it failed,
+    - that the current changes are saved to the current browser and that they are not lost.
+    - that it is being retried,
+    - the amount of retries,
+    - a countdown to the next auto-retry
+  - show a button to cancel the sending/retry
 
 ## Identifier
 
