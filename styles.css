@@ -85,9 +85,9 @@ body::before {
 }
 
 .page {
-  width: min(1280px, 100%);
+  width: 100%;
   margin: 0 auto;
-  padding: 44px 20px 64px;
+  padding: 44px clamp(16px, 2vw, 32px) 64px;
 }
 
 .page-header {
@@ -212,6 +212,13 @@ select:disabled:hover {
 .field-error {
   color: var(--error);
   font-weight: 500;
+}
+
+.isbn-error {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .field-hint {
@@ -442,6 +449,14 @@ td select:hover {
 td input:focus,
 td select:focus {
   background: var(--surface);
+}
+
+td input[aria-invalid="true"],
+td select[aria-invalid="true"],
+td input[aria-invalid="true"]:hover,
+td select[aria-invalid="true"]:hover {
+  background: var(--error-bg);
+  border-color: var(--brand-orange);
 }
 
 td input[type="number"] {

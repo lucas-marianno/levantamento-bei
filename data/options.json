@@ -1,5 +1,6 @@
 {
   "_comment": "Substitua os itens de exemplo pelas listas oficiais quando estiverem disponíveis.",
+  "isbnRequestDelayMs": 2000,
   "schools": [
     "EMEB Exemplo 1",
     "EMEB Exemplo 2"

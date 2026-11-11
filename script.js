@@ -4,9 +4,14 @@ const SAVE_LABEL = "Salvar";
 const SAVE_IN_PROGRESS_LABEL = "Salvando...";
 const OPTIONS_URL = "data/options.json";
 
-const ISBN_LOOKUP_DEBOUNCE_MS = 650;
+const PLACEHOLDER_ISBN_METADATA = {
+  titulo: "Título do livro de exemplo",
+  autor: "Autor Exemplo",
+  editora: "Editora de Exemplo",
+};
 
 const FALLBACK_OPTIONS = {
+  isbnRequestDelayMs: 2000,
   schools: ["EMEB Exemplo 1", "EMEB Exemplo 2"],
   cdd: [
     { value: "000", label: "000 - Generalidades" },
@@ -37,6 +42,7 @@ const COLUMNS = [
     label: "Editora",
     type: "text",
     required: true,
+    sanitize: true,
   },
   {
     key: "isbn",
@@ -136,8 +142,7 @@ let pendingDeleteRow = null;
 let cddTooltipPinned = false;
 let cddTooltipHovered = false;
 
-const isbnCache = new Map();
-const isbnLookupTimers = new WeakMap();
+let lastIsbnRequestAt = 0;
 
 let isSaving = false;
 
@@ -158,6 +163,28 @@ function normalizeIsbn(value) {
   return String(value ?? "")
     .replace(/[^0-9Xx]/g, "")
     .toUpperCase();
+}
+
+function isValidIsbn(isbn) {
+  // TODO: validate the ISBN-10/ISBN-13 checksum before sending the lookup request.
+  // Stub: accept every ISBN for now.
+  void isbn;
+
+  return true;
+}
+
+function canSendIsbnRequest() {
+  // TODO: return false while appOptions.isbnRequestDelayMs has not elapsed since
+  // the last request, and queue the pending lookup instead of dropping it.
+  // Stub: always allow requests for now.
+  void lastIsbnRequestAt;
+  void appOptions.isbnRequestDelayMs;
+
+  return true;
+}
+
+function registerIsbnRequest() {
+  lastIsbnRequestAt = Date.now();
 }
 
 function formatSavedAt(timestamp) {
@@ -205,6 +232,10 @@ async function loadOptions() {
     const data = await response.json();
 
     appOptions = {
+      isbnRequestDelayMs:
+        Number.isFinite(data.isbnRequestDelayMs) && data.isbnRequestDelayMs >= 0
+          ? data.isbnRequestDelayMs
+          : FALLBACK_OPTIONS.isbnRequestDelayMs,
       schools:
         Array.isArray(data.schools) && data.schools.length > 0
           ? data.schools
@@ -456,6 +487,30 @@ function getRowControlMap(row) {
   return controls;
 }
 
+function getIsbnErrorElement(row) {
+  return row.querySelector(".isbn-error");
+}
+
+function setIsbnError(row, message) {
+  const isbnInput = getRowControl(row, "isbn");
+  const errorElement = getIsbnErrorElement(row);
+
+  if (!isbnInput || !errorElement) {
+    return;
+  }
+
+  if (message) {
+    errorElement.textContent = message;
+    errorElement.hidden = false;
+    isbnInput.setAttribute("aria-invalid", "true");
+    return;
+  }
+
+  errorElement.textContent = "";
+  errorElement.hidden = true;
+  isbnInput.removeAttribute("aria-invalid");
+}
+
 function getControlValue(control, type) {
   if (!control) {
     return type === "checkbox" ? false : "";
@@ -565,6 +620,23 @@ function setRowFlag(row, flagged) {
     const control = getRowControl(row, column.key);
 
     if (!control) {
+      return;
+    }
+
+    if (column.isbn) {
+      if (flagged && missingKeys.has(column.key)) {
+        const isbn = normalizeIsbn(getControlValue(control, "text"));
+
+        setIsbnError(
+          row,
+          isbn
+            ? "ISBN inválido. Verifique o número informado."
+            : 'Informe o ISBN ou marque "Não possui ISBN".'
+        );
+      } else {
+        setIsbnError(row, "");
+      }
+
       return;
     }
 
@@ -747,6 +819,16 @@ function createBookRow(values = {}) {
     }
 
     cell.append(control);
+
+    if (column.isbn) {
+      const errorElement = document.createElement("span");
+      errorElement.className = "field-error isbn-error";
+      errorElement.id = `isbn-error-${row.dataset.rowId}`;
+      errorElement.hidden = true;
+      control.setAttribute("aria-describedby", errorElement.id);
+      cell.append(errorElement);
+    }
+
     row.append(cell);
   });
 
@@ -905,187 +987,86 @@ function handleMatriculaInput() {
   saveState();
 }
 
-function clearIsbnLookupTimer(row) {
-  const timer = isbnLookupTimers.get(row);
-
-  if (timer) {
-    clearTimeout(timer);
-    isbnLookupTimers.delete(row);
-  }
-
-  const isbnInput = getRowControl(row, "isbn");
-
-  if (isbnInput) {
-    isbnInput.removeAttribute("aria-busy");
-  }
-}
-
-function scheduleIsbnLookup(row) {
-  clearIsbnLookupTimer(row);
-
+function handleIsbnChange(row) {
   const values = getRowValues(row);
   const isbnInput = getRowControl(row, "isbn");
   const isbn = normalizeIsbn(isbnInput?.value ?? "");
 
   if (values.semIsbn || isbn === "") {
+    setIsbnError(row, "");
+    row.dataset.isbnLookupState = values.semIsbn ? "manual" : "idle";
+    applyRowConditionalState(row);
+    return;
+  }
+
+  if (
+    row.dataset.lastIsbn === isbn &&
+    row.dataset.isbnLookupState === "success"
+  ) {
+    setIsbnError(row, "");
+    return;
+  }
+
+  const isbnFormatIsValid = /^(\d{9}[\dX]|\d{13})$/.test(isbn);
+
+  if (!isbnFormatIsValid || !isValidIsbn(isbn)) {
+    // TODO: use a more specific message once the real ISBN validation exists.
+    setIsbnError(row, "ISBN inválido");
     row.dataset.isbnLookupState = "idle";
     applyRowConditionalState(row);
     return;
   }
 
-  if (!/^(\d{9}[\dX]|\d{13})$/.test(isbn)) {
-    row.dataset.isbnLookupState = "idle";
-    applyRowConditionalState(row);
-    return;
-  }
+  setIsbnError(row, "");
 
-  row.dataset.isbnLookupState = "loading";
-  isbnInput.setAttribute("aria-busy", "true");
-  applyRowConditionalState(row);
-
-  const timer = setTimeout(() => {
-    isbnLookupTimers.delete(row);
-    lookupIsbn(row, isbn);
-  }, ISBN_LOOKUP_DEBOUNCE_MS);
-
-  isbnLookupTimers.set(row, timer);
-}
-
-async function lookupIsbn(row, isbn) {
-  if (!row.isConnected || getRowValues(row).semIsbn) {
-    return;
-  }
-
-  const currentIsbn = normalizeIsbn(getRowControl(row, "isbn")?.value ?? "");
-
-  if (currentIsbn !== isbn) {
-    return;
-  }
-
-  try {
-    let metadata = isbnCache.get(isbn);
-
-    if (!metadata) {
-      const response = await fetch(
-        `https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(
-          isbn
-        )}`
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          response.status === 429
-            ? "limite de consultas à API de ISBN atingido"
-            : "falha na consulta do ISBN"
-        );
-      }
-
-      const data = await response.json();
-      const volume = data.items?.[0]?.volumeInfo;
-
-      if (!volume) {
-        throw new Error("ISBN não encontrado");
-      }
-
-      metadata = {
-        titulo: sanitizeText(volume.title || ""),
-        autor: sanitizeText(
-          Array.isArray(volume.authors) ? volume.authors.join(", ") : ""
-        ),
-        editora: String(volume.publisher || "").trim(),
-      };
-
-      isbnCache.set(isbn, metadata);
-    }
-
-    if (
-      !row.isConnected ||
-      getRowValues(row).semIsbn ||
-      normalizeIsbn(getRowControl(row, "isbn")?.value ?? "") !== isbn
-    ) {
-      return;
-    }
-
-    const controls = getRowControlMap(row);
-
-    if (metadata.titulo) {
-      setControlValue(controls.titulo, "text", metadata.titulo);
-    }
-
-    if (metadata.autor) {
-      setControlValue(controls.autor, "text", metadata.autor);
-    }
-
-    if (metadata.editora) {
-      setControlValue(controls.editora, "text", metadata.editora);
-    }
-
-    const hasCompleteMetadata =
-      Boolean(metadata.titulo) &&
-      Boolean(metadata.autor) &&
-      Boolean(metadata.editora);
-
-    row.dataset.isbnLookupState = hasCompleteMetadata ? "success" : "failed";
-    applyRowConditionalState(row);
-    updateRowSaveStatus(row);
-    refreshFlaggedRow(row);
-
-    if (!hasCompleteMetadata) {
-      showFeedback(
-        `A API do ISBN ${isbn} retornou dados incompletos. Preencha os campos restantes manualmente.`,
-        "error",
-        "isbn"
-      );
-    }
-
-    saveState();
-  } catch (error) {
-    if (
-      !row.isConnected ||
-      normalizeIsbn(getRowControl(row, "isbn")?.value ?? "") !== isbn
-    ) {
-      return;
-    }
-
-    row.dataset.isbnLookupState = "failed";
-    applyRowConditionalState(row);
-    updateRowSaveStatus(row);
-
-    const message =
-      error instanceof Error ? error.message : "erro inesperado na consulta";
-
-    showFeedback(
-      `Não foi possível buscar os dados do ISBN ${isbn}: ${message}. Preencha os dados manualmente.`,
-      "error",
-      "isbn"
-    );
-
-    saveState();
-  } finally {
-    if (row.isConnected) {
-      getRowControl(row, "isbn")?.removeAttribute("aria-busy");
-    }
-  }
-}
-
-function handleIsbnChange(row) {
-  const isbnInput = getRowControl(row, "isbn");
-  const isbn = normalizeIsbn(isbnInput?.value ?? "");
-
-  if (row.dataset.lastIsbn === isbn) {
+  if (!canSendIsbnRequest()) {
+    // TODO: queue this lookup and run it after appOptions.isbnRequestDelayMs.
     return;
   }
 
   row.dataset.lastIsbn = isbn;
-  row.dataset.isbnLookupState = "idle";
-  scheduleIsbnLookup(row);
+  row.dataset.isbnLookupState = "loading";
+  isbnInput.setAttribute("aria-busy", "true");
+  applyRowConditionalState(row);
+  void lookupIsbn(row, isbn);
+}
+
+async function lookupIsbn(row, isbn) {
+  // TODO: replace this placeholder with the real ISBN API request.
+  // TODO: handle network/API errors and allow manual metadata entry on failure.
+  if (!row.isConnected || getRowValues(row).semIsbn) {
+    return;
+  }
+
+  if (normalizeIsbn(getRowControl(row, "isbn")?.value ?? "") !== isbn) {
+    return;
+  }
+
+  registerIsbnRequest();
+
+  const metadata = { ...PLACEHOLDER_ISBN_METADATA };
+  const controls = getRowControlMap(row);
+
+  setControlValue(controls.titulo, "text", metadata.titulo);
+  setControlValue(controls.autor, "text", metadata.autor);
+  setControlValue(controls.editora, "text", metadata.editora);
+
+  row.dataset.isbnLookupState = "success";
+  applyRowConditionalState(row);
+  updateRowSaveStatus(row);
+  refreshFlaggedRow(row);
+  saveState();
+
+  if (row.isConnected) {
+    getRowControl(row, "isbn")?.removeAttribute("aria-busy");
+  }
 }
 
 function handleSemIsbnChange(row) {
   const values = getRowValues(row);
   const controls = getRowControlMap(row);
 
-  clearIsbnLookupTimer(row);
+  setIsbnError(row, "");
 
   if (values.semIsbn) {
     setControlValue(controls.isbn, "text", "");
@@ -1139,7 +1120,7 @@ function handleTableChange(event) {
   }
 
   if (columnKey === "isbn") {
-    handleIsbnChange(row);
+    setIsbnError(row, "");
   }
 
   applyRowConditionalState(row);
@@ -1171,7 +1152,6 @@ function notifySavedRowDeletion(row) {
 
 function removeRow(row) {
   notifySavedRowDeletion(row);
-  clearIsbnLookupTimer(row);
   row.remove();
 
   if (!booksBody.querySelector("tr")) {
@@ -1299,7 +1279,9 @@ function sanitizeAllTextFields() {
   nameInput.value = sanitizeText(nameInput.value);
 
   booksBody
-    .querySelectorAll('[data-column-key="titulo"], [data-column-key="autor"]')
+    .querySelectorAll(
+      '[data-column-key="titulo"], [data-column-key="autor"], [data-column-key="editora"]'
+    )
     .forEach((input) => {
       input.value = sanitizeText(input.value);
     });
@@ -1589,6 +1571,19 @@ identificationForm.addEventListener("submit", (event) => {
 schoolSelect.addEventListener("change", handleSchoolChange);
 booksBody.addEventListener("input", handleTableChange);
 booksBody.addEventListener("change", handleTableChange);
+booksBody.addEventListener("focusout", (event) => {
+  const target = event.target;
+
+  if (!(target instanceof Element) || target.dataset.columnKey !== "isbn") {
+    return;
+  }
+
+  const row = target.closest("tr");
+
+  if (row) {
+    handleIsbnChange(row);
+  }
+});
 booksBody.addEventListener("click", handleTableClick);
 addRowsButton.addEventListener("click", handleAddRows);
 submitSurveyButton.addEventListener("click", handleSave);
