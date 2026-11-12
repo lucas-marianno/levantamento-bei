@@ -214,13 +214,6 @@ select:disabled:hover {
   font-weight: 500;
 }
 
-.isbn-error {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.72rem;
-  line-height: 1.25;
-}
-
 .field-hint {
   color: var(--muted);
 }
@@ -375,10 +368,6 @@ td.row-actions {
   height: 16px;
 }
 
-.checkbox-cell {
-  text-align: center;
-}
-
 td input[type="checkbox"].row-checkbox {
   display: inline-block;
   width: 18px;
@@ -461,14 +450,6 @@ td select[aria-invalid="true"]:hover {
 
 td input[type="number"] {
   text-align: center;
-}
-
-.color-select {
-  font-weight: 600;
-}
-
-.color-select option {
-  font-weight: 600;
 }
 
 .table-actions {
