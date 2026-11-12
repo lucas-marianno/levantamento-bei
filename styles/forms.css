@@ -1,0 +1,86 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+label {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: #fbfcfe;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+input:hover,
+select:hover {
+  border-color: var(--border-strong);
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--brand-blue);
+  box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.18);
+}
+
+input[aria-invalid="true"],
+select[aria-invalid="true"] {
+  background: var(--error-bg);
+  border-color: var(--brand-orange);
+}
+
+input[aria-invalid="true"]:focus,
+select[aria-invalid="true"]:focus {
+  border-color: var(--brand-orange-dark);
+  box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.2);
+}
+
+select:disabled {
+  color: #7a8699;
+  background: #eef2f7;
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+select:disabled:hover {
+  border-color: var(--border);
+}
+
+.field-error,
+.field-hint {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.field-error {
+  color: var(--error);
+  font-weight: 500;
+}
+
+.field-hint {
+  color: var(--muted);
+}
+
+#identification-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

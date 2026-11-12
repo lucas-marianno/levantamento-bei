@@ -1,0 +1,34 @@
+@media (max-width: 680px) {
+  .page {
+    padding: 32px 12px 48px;
+  }
+
+  .page-header {
+    gap: 14px;
+  }
+
+  .brand-logo {
+    height: 64px;
+  }
+
+  .card {
+    padding: 20px;
+  }
+
+  .field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .table-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions .btn {
+    width: 100%;
+  }
+}

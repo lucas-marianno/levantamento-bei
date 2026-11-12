@@ -1,0 +1,83 @@
+.warning-dialog {
+  width: min(520px, calc(100% - 32px));
+  padding: 0;
+  background: #fffaf4;
+  border: none;
+  border-top: 8px solid var(--brand-orange);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(24, 36, 61, 0.35);
+}
+
+.warning-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.warning-content {
+  padding: 28px;
+}
+
+.warning-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 16px;
+  color: #2b1000;
+  background: var(--brand-orange);
+  border-radius: 50%;
+  font-size: 2.1rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.warning-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--brand-orange-dark);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.warning-dialog p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.warning-dialog .warning-note {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.save-error-dialog {
+  border-top-color: var(--brand-orange-dark);
+}
+
+.retry-details {
+  margin-top: 18px;
+  padding: 12px 14px;
+  background: #fff1e6;
+  border: 1px solid #f4c39f;
+  border-radius: 10px;
+}
+
+.retry-details p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.retry-details p + p {
+  margin-top: 6px;
+}
+
+.retry-details strong {
+  color: var(--brand-orange-dark);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 28px;
+}

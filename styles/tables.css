@@ -1,0 +1,236 @@
+.table-card {
+  overflow: hidden;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+table {
+  width: 100%;
+  min-width: 1680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+}
+
+.row-actions-header {
+  width: 54px;
+}
+
+.save-status-header {
+  width: 240px;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 13px 12px;
+  color: #ffffff;
+  background: var(--brand-blue);
+  border-bottom: 1px solid var(--brand-blue-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+  vertical-align: middle;
+}
+
+thead th + th {
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.header-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.info-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--brand-yellow);
+  border: 1px solid rgba(24, 36, 61, 0.18);
+  border-radius: 50%;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: help;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.info-button:hover,
+.info-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(240, 233, 4, 0.35);
+  transform: scale(1.08);
+}
+
+td {
+  padding: 5px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+tbody tr:nth-child(even) td {
+  background: #fbfcff;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover td {
+  background: var(--brand-blue-soft);
+}
+
+tbody tr.row-incomplete td {
+  background: #fff1e6;
+}
+
+tbody tr.row-incomplete td:first-child {
+  box-shadow: inset 4px 0 0 var(--brand-orange);
+}
+
+tbody tr.row-incomplete:hover td {
+  background: #ffe7d5;
+}
+
+td.row-actions {
+  width: 54px;
+  text-align: center;
+}
+
+.delete-row-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--brand-orange-dark);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.delete-row-button:hover {
+  color: var(--brand-orange-dark);
+  background: #fff0e5;
+  border-color: #f4c7a7;
+}
+
+.delete-row-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.3);
+}
+
+.delete-row-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+td input[type="checkbox"].row-checkbox {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--brand-blue);
+  cursor: pointer;
+}
+
+td input[type="checkbox"].row-checkbox:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.3);
+}
+
+.save-status-cell {
+  width: 240px;
+  padding: 9px 10px;
+}
+
+.save-status {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.save-status.saved {
+  color: #0b5a27;
+}
+
+.save-status.pending {
+  color: #8a5a00;
+}
+
+.save-status.error {
+  color: var(--brand-orange-dark);
+}
+
+td input:disabled,
+td select:disabled {
+  color: #64748b;
+  background: #eef2f7;
+  border-color: transparent;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+td input[aria-busy="true"] {
+  background: var(--brand-blue-soft);
+}
+
+td input,
+td select {
+  min-width: 0;
+  padding: 9px 8px;
+  background: transparent;
+  border-color: transparent;
+}
+
+td input:hover,
+td select:hover {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+td input:focus,
+td select:focus {
+  background: var(--surface);
+}
+
+td input[aria-invalid="true"],
+td select[aria-invalid="true"],
+td input[aria-invalid="true"]:hover,
+td select[aria-invalid="true"]:hover {
+  background: var(--error-bg);
+  border-color: var(--brand-orange);
+}
+
+td input[type="number"] {
+  text-align: center;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}

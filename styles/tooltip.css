@@ -1,0 +1,25 @@
+.tooltip {
+  position: fixed;
+  z-index: 100;
+  max-width: 260px;
+  padding: 9px 12px;
+  color: #ffffff;
+  background: var(--ink);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(24, 36, 61, 0.28);
+  font-size: 0.84rem;
+  font-weight: 500;
+  pointer-events: auto;
+}
+
+.tooltip a {
+  color: var(--brand-yellow);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.tooltip a:hover,
+.tooltip a:focus-visible {
+  color: #ffffff;
+}
