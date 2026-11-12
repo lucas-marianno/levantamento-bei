@@ -2,8 +2,8 @@ name: Deploy GitHub Pages
 
 on:
   push:
-    branches:
-      - deployment_dev
+    tags:
+      - 'v*-dev'
   workflow_dispatch:
 
 permissions:
