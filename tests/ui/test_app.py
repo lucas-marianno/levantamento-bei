@@ -7,7 +7,6 @@ from pathlib import Path
 
 from playwright.sync_api import expect, sync_playwright
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -59,17 +58,19 @@ class AppUiTest(unittest.TestCase):
         return cls.playwright.chromium.launch(**options)
 
     def setUp(self):
-        self.context = self.browser.new_context(viewport={"width": 1440, "height": 1200})
+        self.context = self.browser.new_context(
+            viewport={"width": 1440, "height": 1200}
+        )
         self.page = self.context.new_page()
         self.console_errors = []
-        self.page.on(
-            "pageerror", lambda error: self.console_errors.append(str(error))
-        )
+        self.page.on("pageerror", lambda error: self.console_errors.append(str(error)))
         self.page.on(
             "console",
-            lambda message: self.console_errors.append(message.text)
-            if message.type == "error"
-            else None,
+            lambda message: (
+                self.console_errors.append(message.text)
+                if message.type == "error"
+                else None
+            ),
         )
         self.page.goto(self.base_url, wait_until="networkidle")
 
@@ -136,9 +137,7 @@ class AppUiTest(unittest.TestCase):
         page.locator("#responsavel").blur()
         self.assertEqual(page.input_value("#responsavel"), "JOSE DA SILVA")
 
-        self.assertEqual(
-            page.get_attribute("#responsavel", "aria-invalid"), "false"
-        )
+        self.assertEqual(page.get_attribute("#responsavel", "aria-invalid"), "false")
         self.assertTrue(page.locator("#escola").is_disabled())
 
         page.select_option("#cargo", "Oficial de Escola")
@@ -200,9 +199,9 @@ class AppUiTest(unittest.TestCase):
         self.fill_theme_rows(block_index=0)
 
         expect(first_block.locator("tbody tr")).to_have_count(6)
-        expect(first_block.locator("tbody tr").nth(0).locator(".save-status")).to_have_text(
-            "Entrada não salva"
-        )
+        expect(
+            first_block.locator("tbody tr").nth(0).locator(".save-status")
+        ).to_have_text("Entrada não salva")
 
         second_block = page.locator(".theme-block").nth(1)
         self.assertEqual(second_block.locator("tbody tr").count(), 5)
@@ -240,7 +239,8 @@ class AppUiTest(unittest.TestCase):
             "Temática Africana: 1"
         )
         self.assertIn(
-            "row-incomplete", african_block.locator("tbody tr").nth(0).get_attribute("class")
+            "row-incomplete",
+            african_block.locator("tbody tr").nth(0).get_attribute("class"),
         )
 
         row = african_block.locator("tbody tr").nth(0)
@@ -256,9 +256,7 @@ class AppUiTest(unittest.TestCase):
         )
         expect(page.locator("#survey-feedback-v3")).to_contain_text("000-099")
         self.assertEqual(
-            page.locator(".cdd-quantity-input").nth(0).get_attribute(
-                "aria-invalid"
-            ),
+            page.locator(".cdd-quantity-input").nth(0).get_attribute("aria-invalid"),
             "true",
         )
 
@@ -274,7 +272,9 @@ class AppUiTest(unittest.TestCase):
             "success", page.locator("#survey-feedback-v3").get_attribute("class")
         )
         expect(page.locator("#cdd-form-status")).to_contain_text("Salvo em")
-        self.assertEqual(page.locator("#submit-survey-v3").text_content().strip(), "Salvar")
+        self.assertEqual(
+            page.locator("#submit-survey-v3").text_content().strip(), "Salvar"
+        )
 
         draft = page.evaluate(
             "() => JSON.parse(localStorage.getItem('registro-livros:v3:draft'))"
