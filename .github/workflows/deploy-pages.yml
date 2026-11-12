@@ -32,8 +32,8 @@ jobs:
       - name: Stage static site
         run: |
           mkdir -p _site
-          cp index.html styles.css script.js _site/
-          cp -r data assets _site/
+          cp index.html _site/
+          cp -r src styles data assets _site/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

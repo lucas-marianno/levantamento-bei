@@ -1,0 +1,26 @@
+.feedback {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.feedback.success {
+  color: #0b5a27;
+  background: #e7f8ed;
+  border-color: #a8dfba;
+}
+
+.feedback.error {
+  color: #8a3600;
+  background: #fff1e6;
+  border-color: #f4c39f;
+}
+
+.feedback.info {
+  color: var(--brand-blue-dark);
+  background: var(--brand-blue-soft);
+  border-color: #b9cae8;
+}

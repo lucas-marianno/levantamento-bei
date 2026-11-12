@@ -1,0 +1,64 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.3);
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn-primary {
+  color: #ffffff;
+  background: var(--brand-blue);
+  border-color: var(--brand-blue);
+}
+
+.btn-primary:hover {
+  background: var(--brand-blue-dark);
+  border-color: var(--brand-blue-dark);
+}
+
+.btn-secondary {
+  color: var(--brand-blue-dark);
+  background: var(--surface);
+  border-color: var(--brand-blue);
+}
+
+.btn-secondary:hover {
+  background: var(--brand-blue-soft);
+}
+
+.btn-danger {
+  color: #2b1000;
+  background: var(--brand-orange);
+  border-color: var(--brand-orange);
+}
+
+.btn-danger:hover {
+  background: #e85d12;
+  border-color: #e85d12;
+}
+
+.btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.35);
+}

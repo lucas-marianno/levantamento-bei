@@ -1,0 +1,52 @@
+.page {
+  width: 100%;
+  margin: 0 auto;
+  padding: 44px clamp(16px, 2vw, 32px) 64px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 26px;
+}
+
+.brand-logo {
+  width: auto;
+  height: 78px;
+  padding: 7px 10px;
+  object-fit: contain;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(39, 66, 122, 0.1);
+}
+
+.page-header h1 {
+  margin: 0;
+  color: var(--brand-blue-dark);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.card {
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.card + .card {
+  margin-top: 24px;
+}
+
+.card h2 {
+  margin: 0 0 22px;
+  color: var(--brand-blue-dark);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}

@@ -1,0 +1,19 @@
+:root {
+  --brand-blue: #365caa;
+  --brand-blue-dark: #27427a;
+  --brand-blue-soft: #e8eef9;
+  --brand-green: #1bb24b;
+  --brand-orange: #f36c21;
+  --brand-orange-dark: #c2410c;
+  --brand-yellow: #f0e904;
+  --ink: #18243d;
+  --muted: #5c687c;
+  --surface: #ffffff;
+  --bg: #f3f6fb;
+  --border: #d7dfeb;
+  --border-strong: #aebbd0;
+  --error: #b45309;
+  --error-bg: #fff8eb;
+  --radius: 14px;
+  --shadow: 0 18px 40px rgba(39, 66, 122, 0.1);
+}

@@ -1,2 +1,7 @@
 # Reference Documents
 ref/
+
+# Python test cache
+__pycache__/
+*.pyc
+.venv/
