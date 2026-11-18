@@ -44,7 +44,11 @@ test("normalizeThemes creates fallback ids and de-duplicates them", () => {
 });
 
 test("normalizeOptions falls back when optional lists are missing", () => {
-  assert.deepEqual(normalizeOptions({}, fallback), fallback);
+  assert.deepEqual(normalizeOptions({}, fallback), {
+    ...fallback,
+    collectionPeriod: null,
+    supabase: null,
+  });
 });
 
 test("normalizeOptions applies valid values from options.json", () => {
@@ -71,6 +75,8 @@ test("normalizeOptions applies valid values from options.json", () => {
         ],
         themes: [{ id: "indigena", label: "Temática Indígena" }],
       },
+      collectionPeriod: null,
+      supabase: null,
     }
   );
 });

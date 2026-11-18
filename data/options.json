@@ -1,6 +1,19 @@
 {
   "_comment": "Substitua os itens de exemplo pelas listas oficiais quando estiverem disponíveis.",
   "isbnRequestDelayMs": 2000,
+  "collectionPeriod": {
+    "start": "2026-11-30",
+    "end": "2027-02-28"
+  },
+  "supabase": {
+    "url": "https://jxndblpwvxbtqcuxwlpr.supabase.co",
+    "publishableKey": "sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ",
+    "functions": {
+      "whitelist": "quick-processor",
+      "saveSurvey": "save_survey",
+      "deleteThemeRow": "delete_theme_row"
+    }
+  },
   "schools": [
     "Afonso Monteiro da Cruz - EMEB",
     "Agostinho dos Santos - EMEB",

@@ -80,7 +80,7 @@ export function createSaveController({
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (isSaving) {
       return;
     }
@@ -95,9 +95,18 @@ export function createSaveController({
     identification.markAllTouched();
     identification.updateState();
 
+    if (identification.ensureWhitelistChecked) {
+      try {
+        await identification.ensureWhitelistChecked();
+      } catch {
+        // State is updated by identification; validation below will report failure.
+      }
+      identification.updateState();
+    }
+
     if (!identification.isValid()) {
       feedback.show(
-        "Preencha corretamente o nome, o cargo e a matrícula antes de salvar.",
+        "Preencha corretamente o nome, o cargo e a matrícula (autorizada) antes de salvar.",
         "error",
         "submit"
       );
@@ -121,6 +130,34 @@ export function createSaveController({
       );
       partialGroups[0].block.tbody
         .querySelector("tr.row-incomplete")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const duplicateTitleGroups = themeBlocks.collectDuplicateTitleGroups
+      ? themeBlocks.collectDuplicateTitleGroups()
+      : [];
+
+    if (duplicateTitleGroups.length > 0) {
+      const detail = duplicateTitleGroups
+        .map(
+          ({ block, duplicates }) =>
+            `${block.theme.label}: ${duplicates
+              .map(
+                (duplicate) =>
+                  `"${duplicate.title}" (linhas ${formatRowNumbers(duplicate.numbers)})`
+              )
+              .join(", ")}`
+        )
+        .join("; ");
+
+      feedback.show(
+        `Títulos duplicados no mesmo tema — ${detail}. Cada título deve ser único por tema.`,
+        "error",
+        "submit"
+      );
+      duplicateTitleGroups[0].block.tbody
+        .querySelector('input[data-column-key="titulo"][aria-invalid="true"]')
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -162,7 +199,9 @@ export function createSaveController({
   }
 
   function wireEvents() {
-    saveButton.addEventListener("click", handleSave);
+    saveButton.addEventListener("click", () => {
+      void handleSave();
+    });
   }
 
   return { handleSave, wireEvents };
