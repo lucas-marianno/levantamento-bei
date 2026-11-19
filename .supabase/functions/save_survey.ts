@@ -45,6 +45,20 @@ function isPlainObject(value: unknown): value is AnyRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function dbError(label: string, error: unknown): Response {
+  console.error(label, error);
+
+  const detail = isPlainObject(error)
+    ? {
+        code: typeof error.code === "string" ? error.code : undefined,
+        message: typeof error.message === "string" ? error.message : undefined,
+        hint: typeof error.hint === "string" ? error.hint : undefined,
+      }
+    : null;
+
+  return Response.json({ error: label, detail }, { status: 500 });
+}
+
 function parseMatricula(value: unknown): number | null {
   const n =
     typeof value === "number"
@@ -208,7 +222,7 @@ async function checkWhitelist(
   }
 
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/quick-processor`, {
+    const response = await fetch(`${supabaseUrl}/functions/v1/is_user_whitelisted`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -317,8 +331,7 @@ export default {
       .maybeSingle();
 
     if (respondentSelectError) {
-      console.error("Respondent lookup failed:", respondentSelectError);
-      return Response.json({ error: "Failed to load respondent" }, { status: 500 });
+      return dbError("Failed to load respondent", respondentSelectError);
     }
 
     let respondentId: string;
@@ -329,8 +342,7 @@ export default {
         .update({ name: responsavel, role: cargo, emeb: escola })
         .eq("id", respondentId);
       if (respondentUpdateError) {
-        console.error("Respondent update failed:", respondentUpdateError);
-        return Response.json({ error: "Failed to update respondent" }, { status: 500 });
+        return dbError("Failed to update respondent", respondentUpdateError);
       }
     } else {
       const { data: insertedRespondent, error: respondentInsertError } = await ctx.supabaseAdmin
@@ -339,8 +351,7 @@ export default {
         .select("id")
         .single();
       if (respondentInsertError || !insertedRespondent?.id) {
-        console.error("Respondent insert failed:", respondentInsertError);
-        return Response.json({ error: "Failed to create respondent" }, { status: 500 });
+        return dbError("Failed to create respondent", respondentInsertError);
       }
       respondentId = insertedRespondent.id as string;
     }
@@ -350,8 +361,7 @@ export default {
       .select("id,cdd,deleted_at")
       .eq("respondent_id", respondentId);
     if (cddLoadError) {
-      console.error("CDD load failed:", cddLoadError);
-      return Response.json({ error: "Failed to load CDD records" }, { status: 500 });
+      return dbError("Failed to load CDD records", cddLoadError);
     }
 
     const { data: existingTheme, error: themeLoadError } = await ctx.supabaseAdmin
@@ -359,8 +369,7 @@ export default {
       .select("id,client_row_id,deleted_at")
       .eq("respondent_id", respondentId);
     if (themeLoadError) {
-      console.error("Theme load failed:", themeLoadError);
-      return Response.json({ error: "Failed to load theme records" }, { status: 500 });
+      return dbError("Failed to load theme records", themeLoadError);
     }
 
     const payloadCddSet = new Set(cddItems.map((i) => i.cdd));
@@ -376,8 +385,7 @@ export default {
         .update({ deleted_at: savedAt })
         .in("id", cddIdsToDelete);
       if (error) {
-        console.error("CDD reconcile failed:", error);
-        return Response.json({ error: "Failed to reconcile CDD records" }, { status: 500 });
+        return dbError("Failed to reconcile CDD records", error);
       }
     }
 
@@ -390,8 +398,7 @@ export default {
         .update({ deleted_at: savedAt })
         .in("id", themeIdsToDelete);
       if (error) {
-        console.error("Theme reconcile failed:", error);
-        return Response.json({ error: "Failed to reconcile theme records" }, { status: 500 });
+        return dbError("Failed to reconcile theme records", error);
       }
     }
 
@@ -415,8 +422,7 @@ export default {
           })
           .eq("id", existing.id);
         if (error) {
-          console.error("CDD upsert(update) failed:", error, item.cdd);
-          return Response.json({ error: `Failed to save CDD record ${item.cdd}` }, { status: 500 });
+          return dbError(`Failed to save CDD record ${item.cdd}`, error);
         }
       } else {
         const { error } = await ctx.supabaseAdmin.from("exemplar_cdd").insert({
@@ -429,8 +435,7 @@ export default {
           deleted_at: null,
         });
         if (error) {
-          console.error("CDD upsert(insert) failed:", error, item.cdd);
-          return Response.json({ error: `Failed to save CDD record ${item.cdd}` }, { status: 500 });
+          return dbError(`Failed to save CDD record ${item.cdd}`, error);
         }
       }
     }
@@ -458,8 +463,7 @@ export default {
           })
           .eq("id", existing.id);
         if (error) {
-          console.error("Theme upsert(update) failed:", error, item.client_row_id);
-          return Response.json({ error: "Failed to save theme record" }, { status: 500 });
+          return dbError("Failed to save theme record", error);
         }
       } else {
         const { error } = await ctx.supabaseAdmin.from("exemplar_theme").insert({
@@ -474,8 +478,7 @@ export default {
           deleted_at: null,
         });
         if (error) {
-          console.error("Theme upsert(insert) failed:", error, item.client_row_id);
-          return Response.json({ error: "Failed to save theme record" }, { status: 500 });
+          return dbError("Failed to save theme record", error);
         }
       }
     }

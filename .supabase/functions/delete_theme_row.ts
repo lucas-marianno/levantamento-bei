@@ -36,7 +36,7 @@ async function checkWhitelist(
   }
 
   try {
-    const response = await fetch(`${supabaseUrl}/functions/v1/quick-processor`, {
+    const response = await fetch(`${supabaseUrl}/functions/v1/is_user_whitelisted`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,

@@ -3,7 +3,7 @@ import { createEdgeFunctionsClient } from "./edge-functions-client.js";
 export function createSurveyGateway({ supabase, functionNames } = {}) {
   const client = createEdgeFunctionsClient(supabase);
   const functions = {
-    whitelist: "quick-processor",
+    whitelist: "is_user_whitelisted",
     saveSurvey: "save_survey",
     deleteThemeRow: "delete_theme_row",
     ...(functionNames || {}),

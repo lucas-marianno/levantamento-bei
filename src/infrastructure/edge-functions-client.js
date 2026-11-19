@@ -11,6 +11,12 @@ export function createEdgeFunctionsClient({ url, publishableKey } = {}) {
         throw new Error("Nome da função ausente.");
       }
 
+      console.debug("[edge-client] invoke", {
+        functionName,
+        baseUrl,
+        hasKey: key.length > 0,
+      });
+
       const response = await fetch(`${baseUrl}/functions/v1/${functionName}`, {
         method: "POST",
         headers: {
@@ -20,6 +26,11 @@ export function createEdgeFunctionsClient({ url, publishableKey } = {}) {
         },
         body: JSON.stringify(body ?? {}),
         signal,
+      });
+
+      console.debug("[edge-client] response", {
+        functionName,
+        status: response.status,
       });
 
       let data = null;

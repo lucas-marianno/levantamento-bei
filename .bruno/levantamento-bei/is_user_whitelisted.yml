@@ -5,7 +5,7 @@ info:
 
 http:
   method: POST
-  url: https://jxndblpwvxbtqcuxwlpr.supabase.co/functions/v1/quick-processor
+  url: https://jxndblpwvxbtqcuxwlpr.supabase.co/functions/v1/is_user_whitelisted
   headers:
     - name: Authorization
       value: Bearer sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ
