@@ -1,0 +1,28 @@
+info:
+  name: is_user_whitelisted
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://jxndblpwvxbtqcuxwlpr.supabase.co/functions/v1/is_user_whitelisted
+  headers:
+    - name: Authorization
+      value: Bearer sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ
+    - name: apikey
+      value: sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "matricula": 1234
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

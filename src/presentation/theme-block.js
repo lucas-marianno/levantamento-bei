@@ -242,7 +242,10 @@ export function createThemeBlock({
   }
 
   function getRowsForPayload() {
-    return getRows().map((row) => getThemeRowValues(row));
+    return getRows().map((row) => ({
+      ...getThemeRowValues(row),
+      rowId: getRowId(row),
+    }));
   }
 
   function getDraftRows() {
@@ -346,6 +349,43 @@ export function createThemeBlock({
       });
   }
 
+  function collectDuplicateTitleRows() {
+    const seen = new Map();
+
+    getRows().forEach((row, rowIndex) => {
+      if (getThemeRowState(row) === "empty") {
+        return;
+      }
+
+      const values = getThemeRowValues(row);
+      const title = sanitizeText(values.titulo).trim();
+      if (!title) {
+        return;
+      }
+
+      const entry = seen.get(title) || { title, numbers: [], rows: [] };
+      entry.numbers.push(rowIndex + 1);
+      entry.rows.push(row);
+      seen.set(title, entry);
+    });
+
+    const duplicates = [];
+    seen.forEach((entry) => {
+      if (entry.numbers.length > 1) {
+        duplicates.push(entry);
+        entry.rows.forEach((row) => {
+          row.classList.add("row-incomplete");
+          const titleControl = getRowControl(row, "titulo");
+          if (titleControl) {
+            titleControl.setAttribute("aria-invalid", "true");
+          }
+        });
+      }
+    });
+
+    return duplicates.map(({ title, numbers }) => ({ title, numbers }));
+  }
+
   function show() {
     section.hidden = false;
   }
@@ -365,6 +405,7 @@ export function createThemeBlock({
     reset,
     restore,
     collectPartialRows,
+    collectDuplicateTitleRows,
     refreshRowFlag,
     getRowSnapshots,
     markError,

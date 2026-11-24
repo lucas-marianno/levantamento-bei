@@ -1,12 +1,20 @@
 import {
   isValidCargo,
-  isValidMatricula,
   isValidName,
 } from "../domain/identification.js";
 import { onlyDigits, sanitizeText } from "../domain/values.js";
 import { getElement } from "./dom.js";
 
-export function createIdentification({ onDataChange, onPersist, onSchoolChange }) {
+function isValidMatriculaFormat(value) {
+  return /^\d{4,5}$/.test(String(value ?? ""));
+}
+
+export function createIdentification({
+  onDataChange,
+  onPersist,
+  onSchoolChange,
+  checkWhitelist,
+}) {
   const form = getElement("identification-form");
   const nameInput = getElement("responsavel");
   const cargoSelect = getElement("cargo");
@@ -16,6 +24,7 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
   const matriculaError = getElement("matricula-error");
   const schoolHint = getElement("escola-hint");
   const schoolSelect = getElement("escola");
+  const defaultMatriculaErrorText = matriculaError.textContent;
 
   const touchedFields = {
     name: false,
@@ -24,12 +33,37 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
   };
 
   let currentSchool = "";
+  let whitelistState = { value: "", status: "idle" }; // idle|checking|ok|denied|error
+  let whitelistRequestId = 0;
 
-  function setFieldError(input, errorElement, isValid, showError) {
+  function setFieldError(input, errorElement, isValid, showError, message) {
     const show = showError && !isValid;
+
+    if (typeof message === "string") {
+      errorElement.textContent = message;
+    }
 
     input.setAttribute("aria-invalid", String(show));
     errorElement.hidden = !show;
+  }
+
+  function getWhitelistMessage() {
+    if (whitelistState.status === "checking") {
+      return "Verificando matrícula...";
+    }
+    if (whitelistState.status === "denied") {
+      return "Matrícula não autorizada.";
+    }
+    if (whitelistState.status === "error") {
+      return "Não foi possível verificar a matrícula. Tente novamente.";
+    }
+    return defaultMatriculaErrorText;
+  }
+
+  function isMatriculaAuthorized() {
+    return isValidMatriculaFormat(matriculaInput.value)
+      ? whitelistState.status === "ok" && whitelistState.value === matriculaInput.value
+      : false;
   }
 
   function populateSchools(schools) {
@@ -54,19 +88,77 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
     schoolSelect.append(fragment);
   }
 
+  async function ensureWhitelistChecked() {
+    const value = matriculaInput.value;
+
+    if (!isValidMatriculaFormat(value)) {
+      if (whitelistState.value !== value) {
+        whitelistState = { value, status: "idle" };
+      }
+      return false;
+    }
+
+    if (
+      whitelistState.value === value &&
+      (whitelistState.status === "ok" || whitelistState.status === "denied")
+    ) {
+      return whitelistState.status === "ok";
+    }
+
+    if (typeof checkWhitelist !== "function") {
+      // Fallback: if no remote check configured, rely on format validity.
+      whitelistState = { value, status: "ok" };
+      return true;
+    }
+
+    const requestId = ++whitelistRequestId;
+    whitelistState = { value, status: "checking" };
+    updateState();
+
+    try {
+      const ok = await checkWhitelist(Number(value));
+      if (requestId !== whitelistRequestId || matriculaInput.value !== value) {
+        return whitelistState.value === value && whitelistState.status === "ok";
+      }
+      whitelistState = { value, status: ok ? "ok" : "denied" };
+    } catch {
+      if (requestId !== whitelistRequestId || matriculaInput.value !== value) {
+        return false;
+      }
+      whitelistState = { value, status: "error" };
+    }
+
+    updateState();
+    onPersist?.();
+    return whitelistState.status === "ok";
+  }
+
   function updateState() {
     const nameValid = isValidName(nameInput.value);
     const cargoValid = isValidCargo(cargoSelect.value);
-    const matriculaValid = isValidMatricula(matriculaInput.value);
+    const matriculaFormatValid = isValidMatriculaFormat(matriculaInput.value);
+    const matriculaAuthorized = isMatriculaAuthorized();
+    const matriculaValid = matriculaFormatValid && matriculaAuthorized;
 
     setFieldError(nameInput, nameError, nameValid, touchedFields.name);
     setFieldError(cargoSelect, cargoError, cargoValid, touchedFields.cargo);
-    setFieldError(
-      matriculaInput,
-      matriculaError,
-      matriculaValid,
-      touchedFields.matricula
-    );
+
+    const showMatriculaError =
+      touchedFields.matricula &&
+      (!matriculaFormatValid ||
+        whitelistState.status === "denied" ||
+        whitelistState.status === "error");
+    const matriculaMessage = !matriculaFormatValid
+      ? "A matrícula deve conter 4 ou 5 dígitos."
+      : getWhitelistMessage();
+
+    if (touchedFields.matricula) {
+      matriculaError.textContent = matriculaMessage;
+    } else {
+      matriculaError.textContent = defaultMatriculaErrorText;
+    }
+    matriculaInput.setAttribute("aria-invalid", String(showMatriculaError));
+    matriculaError.hidden = !showMatriculaError;
 
     const formValid = nameValid && cargoValid && matriculaValid;
 
@@ -112,6 +204,9 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
       schoolSelect.value = savedSchool;
     }
 
+    // Reset whitelist state; will be revalidated when user interacts/saves.
+    whitelistState = { value: "", status: "idle" };
+
     return typeof savedSchool === "string" ? savedSchool : "";
   }
 
@@ -125,7 +220,8 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
     return (
       isValidName(nameInput.value) &&
       isValidCargo(cargoSelect.value) &&
-      isValidMatricula(matriculaInput.value)
+      isValidMatriculaFormat(matriculaInput.value) &&
+      isMatriculaAuthorized()
     );
   }
 
@@ -164,7 +260,7 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
       nameInput.value = sanitizeText(nameInput.value);
       touchedFields.name = true;
       updateState();
-      onPersist();
+      onPersist?.();
     });
 
     cargoSelect.addEventListener("change", () => {
@@ -175,6 +271,7 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
 
     matriculaInput.addEventListener("input", () => {
       matriculaInput.value = onlyDigits(matriculaInput.value, 5);
+      whitelistState = { value: "", status: "idle" };
       updateState();
       onDataChange();
     });
@@ -182,6 +279,7 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
     matriculaInput.addEventListener("blur", () => {
       touchedFields.matricula = true;
       updateState();
+      void ensureWhitelistChecked();
     });
 
     form.addEventListener("submit", (event) => {
@@ -199,6 +297,7 @@ export function createIdentification({ onDataChange, onPersist, onSchoolChange }
     restore,
     markAllTouched,
     isValid,
+    ensureWhitelistChecked,
     getFormValues,
     getSchool,
     setCurrentSchool,

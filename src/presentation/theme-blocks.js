@@ -121,6 +121,22 @@ export function createThemeBlocks({
     return groups;
   }
 
+  function collectDuplicateTitleGroups() {
+    const groups = [];
+
+    blocks.forEach((block) => {
+      const duplicates = block.collectDuplicateTitleRows
+        ? block.collectDuplicateTitleRows()
+        : [];
+
+      if (duplicates.length > 0) {
+        groups.push({ block, duplicates });
+      }
+    });
+
+    return groups;
+  }
+
   function clearFlags() {
     blocks.forEach((block) => {
       block.clearFlags();
@@ -273,6 +289,7 @@ export function createThemeBlocks({
     getThemesForPayload,
     getRowSnapshots,
     collectPartialGroups,
+    collectDuplicateTitleGroups,
     clearFlags,
     updateAllStatuses,
     sanitizeTextFields,

@@ -13,11 +13,29 @@ import { createIdentification } from "./presentation/identification.js";
 import { createSaveController } from "./presentation/save-controller.js";
 import { createThemeBlocks } from "./presentation/theme-blocks.js";
 
+function isWithinCollectionPeriod(period, now = new Date()) {
+  if (!period || typeof period !== "object") {
+    return true;
+  }
+
+  const start = typeof period.start === "string" ? period.start : "";
+  const end = typeof period.end === "string" ? period.end : "";
+  if (!start || !end) {
+    return true;
+  }
+
+  const day = now.toISOString().slice(0, 10);
+  return day >= start && day <= end;
+}
+
 async function init() {
   const optionsRepository = createOptionsRepository();
   const draftRepository = createDraftRepository();
-  const gateway = createSurveyGateway();
   const options = await optionsRepository.load();
+  const gateway = createSurveyGateway({
+    supabase: options.supabase,
+    functionNames: options.supabase?.functions,
+  });
 
   const feedback = createFeedback(getElement("survey-feedback-v3"));
   const saveSection = getElement("save-section");
@@ -27,12 +45,14 @@ async function init() {
     button: getElement("cdd-form-info-button"),
     tooltip: getElement("cdd-tooltip"),
   });
+  const submitButton = getElement("submit-survey-v3");
 
   let identification;
   let cddForm;
   let themeBlocks;
   let pendingSchool = null;
   let pendingDeleteRow = null;
+  const collectionOpen = isWithinCollectionPeriod(options.collectionPeriod);
 
   function saveDraft() {
     draftRepository.save(
@@ -125,7 +145,14 @@ async function init() {
   }
 
   function handleDeleteSavedRow(payload) {
-    notifySavedRowDeletion({ gateway, payload });
+    const matricula = identification.getFormValues().matricula;
+    notifySavedRowDeletion({
+      gateway,
+      payload: {
+        ...payload,
+        matricula,
+      },
+    });
   }
 
   function handleIncompleteCleared() {
@@ -139,6 +166,7 @@ async function init() {
     },
     onPersist: saveDraft,
     onSchoolChange: handleSchoolChange,
+    checkWhitelist: async (matricula) => gateway.isUserWhitelisted(matricula),
   });
   identification.populateSchools(options.schools);
 
@@ -169,7 +197,7 @@ async function init() {
     cddForm,
     themeBlocks,
     feedback,
-    saveButton: getElement("submit-survey-v3"),
+    saveButton: submitButton,
     gateway,
     onSaveDraft: saveDraft,
   });
@@ -200,6 +228,16 @@ async function init() {
   }
 
   identification.updateState();
+
+  if (!collectionOpen) {
+    submitButton.disabled = true;
+    submitButton.title = "Período de coleta encerrado.";
+    feedback.show(
+      "O período de coleta de respostas não está aberto no momento.",
+      "error",
+      "collection-period"
+    );
+  }
 
   identification.wireEvents();
 
