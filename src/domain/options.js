@@ -63,6 +63,28 @@ export function normalizeOptions(data, fallbackOptions) {
       ? data.v3.initialThemeRows
       : fallbackOptions.v3.initialThemeRows;
 
+  const collectionPeriod =
+    data?.collectionPeriod && typeof data.collectionPeriod === "object"
+      ? {
+          ...(fallbackOptions.collectionPeriod || {}),
+          ...data.collectionPeriod,
+        }
+      : fallbackOptions.collectionPeriod || null;
+
+  const supabase =
+    data?.supabase && typeof data.supabase === "object"
+      ? {
+          ...(fallbackOptions.supabase || {}),
+          ...data.supabase,
+          functions: {
+            ...((fallbackOptions.supabase &&
+              fallbackOptions.supabase.functions) ||
+              {}),
+            ...(data.supabase.functions || {}),
+          },
+        }
+      : fallbackOptions.supabase || null;
+
   return {
     ...fallbackOptions,
     schools:
@@ -77,5 +99,7 @@ export function normalizeOptions(data, fallbackOptions) {
           : fallbackOptions.v3.cddCategories,
       themes: themes.length > 0 ? themes : fallbackOptions.v3.themes,
     },
+    collectionPeriod,
+    supabase,
   };
 }

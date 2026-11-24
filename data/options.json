@@ -1,6 +1,19 @@
 {
   "_comment": "Substitua os itens de exemplo pelas listas oficiais quando estiverem disponíveis.",
   "isbnRequestDelayMs": 2000,
+  "collectionPeriod": {
+    "start": "2026-11-19",
+    "end": "2027-02-28"
+  },
+  "supabase": {
+    "url": "https://jxndblpwvxbtqcuxwlpr.supabase.co",
+    "publishableKey": "sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ",
+    "functions": {
+      "whitelist": "is_user_whitelisted",
+      "saveSurvey": "save_survey",
+      "deleteThemeRow": "delete_theme_row"
+    }
+  },
   "schools": [
     "Afonso Monteiro da Cruz - EMEB",
     "Agostinho dos Santos - EMEB",
@@ -180,20 +193,6 @@
     "Vital Brasil - EMEB",
     "Waldemar Canciani, Professor - EMEB",
     "Zoraida Aparecida Ramos, Professora - EMEB"
-  ],
-  "cdd": [
-    {
-      "value": "000",
-      "label": "000 - Generalidades"
-    },
-    {
-      "value": "010",
-      "label": "010 - Bibliografia"
-    }
-  ],
-  "themes": [
-    "Tema Exemplo 1",
-    "Tema Exemplo 2"
   ],
   "v3": {
     "initialThemeRows": 5,

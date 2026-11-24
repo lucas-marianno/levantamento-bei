@@ -32,7 +32,7 @@ test("buildSurveyPayloadV3 sanitizes the name and filters empty book rows", () =
   assert.deepEqual(payload, {
     responsavel: "JOSE DA SILVA",
     cargo: "Diretor",
-    matricula: "12345",
+    matricula: 12345,
     escola: "Escola A",
     cdd: [{ range: "000-099", quantidade: 1, semAcervo: false }],
     temas: [
