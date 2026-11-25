@@ -65,6 +65,7 @@ class AppUiTest(unittest.TestCase):
         self.page = self.context.new_page()
         self.console_errors = []
         self.submitted_payloads = []
+        self.function_calls = []
         self.page.on("pageerror", lambda error: self.console_errors.append(str(error)))
         self.page.on(
             "console",
@@ -85,6 +86,7 @@ class AppUiTest(unittest.TestCase):
         url = route.request.url
 
         if url.endswith("/is_user_whitelisted"):
+            self.function_calls.append("is_user_whitelisted")
             route.fulfill(
                 status=200,
                 content_type="application/json",
@@ -93,6 +95,7 @@ class AppUiTest(unittest.TestCase):
             return
 
         if url.endswith("/submit_response"):
+            self.function_calls.append("submit_response")
             data = route.request.post_data
             if data:
                 self.submitted_payloads.append(json.loads(data))
@@ -133,6 +136,22 @@ class AppUiTest(unittest.TestCase):
         quantity.fill("2")
         quantity.dispatch_event("change")
         return row
+
+    def fill_valid_survey(self):
+        self.fill_identification()
+        self.select_school()
+
+        boxes = self.page.locator(".cdd-unavailable-checkbox")
+        for index in range(boxes.count()):
+            boxes.nth(index).check()
+
+        self.fill_theme_row(block_index=0, row_index=0, title="Livro Indígena")
+        self.fill_theme_row(block_index=1, row_index=0, title="Livro Africano")
+
+    def close_sent_dialog(self):
+        expect(self.page.locator("#sent-response-dialog")).to_be_visible()
+        self.page.click("#edit-last-response")
+        expect(self.page.locator("#sent-response-dialog")).to_be_hidden()
 
     def test_initial_render(self):
         page = self.page
@@ -328,6 +347,7 @@ class AppUiTest(unittest.TestCase):
         page = self.page
         self.fill_identification()
         self.select_school()
+        school = page.locator("#escola").input_value()
 
         african_block = page.locator(".theme-block").nth(1)
         african_block.locator("tbody tr").nth(0).locator(
@@ -397,6 +417,109 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(submitted["temas"][1]["semAcervo"], False)
         self.assertEqual(submitted["temas"][0]["livros"][0]["titulo"], "LIVRO INDIGENA")
         self.assertNotIn("rowId", submitted["temas"][0]["livros"][0])
+
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        expect(page.locator("#sent-response-description")).to_contain_text(school)
+        expect(page.locator("#sent-response-description")).to_contain_text(
+            "foi enviada com sucesso em"
+        )
+        self.assertTrue(page.locator("#sent-response-note").is_hidden())
+        for _ in range(3):
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(50)
+            expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.close_sent_dialog()
+
+        cached = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('registro-livros:v4:last-response'))"
+        )
+        self.assertEqual(cached["version"], 1)
+        self.assertEqual(cached["submittedAt"], "2026-11-25T12:00:00.000Z")
+        self.assertEqual(cached["escola"], school)
+        self.assertEqual(cached["payload"]["matricula"], 12345)
+
+    def test_no_change_resubmit_skips_backend_and_shows_dialog(self):
+        page = self.page
+        self.fill_valid_survey()
+
+        page.click("#submit-survey-v3")
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.close_sent_dialog()
+
+        whitelist_calls = self.function_calls.count("is_user_whitelisted")
+        submit_calls = self.function_calls.count("submit_response")
+        self.assertEqual(submit_calls, 1)
+
+        page.click("#submit-survey-v3")
+        expect(page.locator("#survey-feedback-v3")).to_have_text(
+            "Resposta já enviada. Nenhuma alteração foi feita."
+        )
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        expect(page.locator("#sent-response-description")).to_contain_text(
+            "já foi enviada em"
+        )
+        expect(page.locator("#sent-response-note")).to_be_visible()
+        expect(page.locator("#sent-response-note")).to_contain_text(
+            "Nenhuma alteração foi feita"
+        )
+
+        self.assertEqual(
+            self.function_calls.count("is_user_whitelisted"), whitelist_calls
+        )
+        self.assertEqual(self.function_calls.count("submit_response"), submit_calls)
+        self.assertEqual(len(self.submitted_payloads), 1)
+
+        for _ in range(3):
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(50)
+            expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.assertTrue(
+            page.evaluate(
+                "() => document.querySelector('#sent-response-dialog').open"
+            )
+        )
+        self.close_sent_dialog()
+
+    def test_cached_response_dialog_is_shown_after_reload(self):
+        page = self.page
+        self.fill_valid_survey()
+        school = page.locator("#escola").input_value()
+
+        page.click("#submit-survey-v3")
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.close_sent_dialog()
+
+        page.reload(wait_until="networkidle")
+
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        expect(page.locator("#sent-response-description")).to_contain_text(school)
+        expect(page.locator("#sent-response-description")).to_contain_text(
+            "foi enviada com sucesso em"
+        )
+        self.assertTrue(page.locator("#sent-response-note").is_hidden())
+        self.close_sent_dialog()
+
+    def test_changed_resubmit_sends_a_new_response(self):
+        page = self.page
+        self.fill_valid_survey()
+
+        page.click("#submit-survey-v3")
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.close_sent_dialog()
+
+        page.locator(".theme-block").nth(0).locator(
+            '[data-column-key="titulo"]'
+        ).nth(0).fill("Livro Indígena Atualizado")
+
+        page.click("#submit-survey-v3")
+        expect(page.locator("#sent-response-dialog")).to_be_visible()
+        self.close_sent_dialog()
+
+        self.assertEqual(len(self.submitted_payloads), 2)
+        self.assertEqual(
+            self.submitted_payloads[1]["temas"][0]["livros"][0]["titulo"],
+            "LIVRO INDIGENA ATUALIZADO",
+        )
 
     def test_school_change_dialog_cancel_and_confirm(self):
         page = self.page

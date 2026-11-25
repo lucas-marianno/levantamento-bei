@@ -1,4 +1,5 @@
 export const V3_STORAGE_KEY = "registro-livros:v3:draft";
+export const LAST_RESPONSE_STORAGE_KEY = "registro-livros:v4:last-response";
 export const V3_DRAFT_VERSION = 4;
 export const SUBMIT_LABEL = "Enviar resposta";
 export const SUBMIT_IN_PROGRESS_LABEL = "Enviando...";

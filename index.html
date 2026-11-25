@@ -246,6 +246,26 @@
     </div>
   </dialog>
 
+  <dialog
+    id="sent-response-dialog"
+    class="success-dialog"
+    aria-labelledby="sent-response-title"
+    aria-describedby="sent-response-description"
+  >
+    <div class="success-content">
+      <div class="success-icon" aria-hidden="true">✓</div>
+      <h2 id="sent-response-title">Resposta enviada</h2>
+      <p id="sent-response-description"></p>
+      <p id="sent-response-note" class="success-note" hidden></p>
+
+      <div class="dialog-actions">
+        <button type="button" id="edit-last-response" class="btn btn-primary">
+          Editar última resposta enviada
+        </button>
+      </div>
+    </div>
+  </dialog>
+
   <div id="cdd-tooltip" class="tooltip" role="tooltip" hidden>
     Classificação Decimal de Dewey. Consulte os códigos de referência nas páginas
     112–130 do

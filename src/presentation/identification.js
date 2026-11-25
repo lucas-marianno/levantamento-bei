@@ -216,13 +216,16 @@ export function createIdentification({
     touchedFields.matricula = true;
   }
 
-  function isValid() {
+  function isValidFormat() {
     return (
       isValidName(nameInput.value) &&
       isValidCargo(cargoSelect.value) &&
-      isValidMatriculaFormat(matriculaInput.value) &&
-      isMatriculaAuthorized()
+      isValidMatriculaFormat(matriculaInput.value)
     );
+  }
+
+  function isValid() {
+    return isValidFormat() && isMatriculaAuthorized();
   }
 
   function getFormValues() {
@@ -296,6 +299,7 @@ export function createIdentification({
     updateState,
     restore,
     markAllTouched,
+    isValidFormat,
     isValid,
     ensureWhitelistChecked,
     getFormValues,

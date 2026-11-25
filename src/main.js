@@ -1,5 +1,7 @@
 import { buildDraft } from "./application/draft.js";
+import { isLastResponseValid } from "./domain/last-response.js";
 import { createDraftRepository } from "./infrastructure/draft-repository.js";
+import { createLastResponseRepository } from "./infrastructure/last-response-repository.js";
 import { createOptionsRepository } from "./infrastructure/options-repository.js";
 import { createSurveyGateway } from "./infrastructure/survey-gateway.js";
 import { createCddForm } from "./presentation/cdd-form.js";
@@ -9,6 +11,7 @@ import { wireSchoolChangeDialog } from "./presentation/dialogs/school-change.js"
 import { getElement } from "./presentation/dom.js";
 import { createFeedback } from "./presentation/feedback.js";
 import { createIdentification } from "./presentation/identification.js";
+import { createSentResponseDialog } from "./presentation/sent-response-dialog.js";
 import { createSubmitController } from "./presentation/submit-controller.js";
 import { createThemeBlocks } from "./presentation/theme-blocks.js";
 
@@ -47,6 +50,15 @@ async function init() {
     tooltip: getElement("cdd-tooltip"),
   });
   const submitButton = getElement("submit-survey-v3");
+  const lastResponseRepository = createLastResponseRepository();
+  const sentResponseDialog = createSentResponseDialog({
+    dialog: getElement("sent-response-dialog"),
+    description: getElement("sent-response-description"),
+    note: getElement("sent-response-note"),
+    editButton: getElement("edit-last-response"),
+  });
+
+  sentResponseDialog.wireEvents();
 
   let identification;
   let cddForm;
@@ -208,6 +220,8 @@ async function init() {
     submitButton,
     gateway,
     onPersistDraft: saveDraft,
+    lastResponseRepository,
+    sentResponseDialog,
   });
 
   const state = draftRepository.load();
@@ -231,6 +245,15 @@ async function init() {
   }
 
   identification.updateState();
+
+  const lastResponse = lastResponseRepository.load();
+
+  if (isLastResponseValid(lastResponse)) {
+    sentResponseDialog.show({
+      escola: lastResponse.escola,
+      submittedAt: lastResponse.submittedAt,
+    });
+  }
 
   if (!collectionOpen) {
     submitButton.disabled = true;
