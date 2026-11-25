@@ -181,6 +181,30 @@ class AppUiTest(unittest.TestCase):
                 "async () => { await document.fonts.ready; return document.fonts.check('16px Parkinsans'); }"
             )
         )
+        self.assertEqual(
+            page.locator(".repo-link").get_attribute("href"),
+            "https://github.com/lucas-marianno/levantamento-bei",
+        )
+        self.assertTrue(page.locator(".repo-link").is_visible())
+        self.assertEqual(page.locator(".repo-link svg").count(), 1)
+        self.assertEqual(
+            page.eval_on_selector(
+                ".repo-link",
+                "element => { const style = getComputedStyle(element); return { position: style.position, marginTop: style.marginTop, opacity: style.opacity }; }",
+            ),
+            {"position": "static", "marginTop": "16px", "opacity": "0.4"},
+        )
+        self.assertTrue(
+            page.evaluate(
+                """() => {
+                    const main = document.querySelector('main');
+                    const save = document.querySelector('#save-section');
+                    const link = document.querySelector('.repo-link');
+                    return link.parentElement === main &&
+                      Boolean(link.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_PRECEDING);
+                }"""
+            )
+        )
 
     def test_identification_validation_and_sanitization(self):
         page = self.page
