@@ -6,6 +6,34 @@
   margin-top: 24px;
 }
 
+.theme-block-actions {
+  gap: 16px;
+  justify-content: flex-start;
+}
+
+.theme-no-acervo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.theme-no-acervo input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--brand-blue);
+  cursor: pointer;
+}
+
+.theme-incomplete .table-scroll {
+  border-color: var(--brand-orange);
+  box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.18);
+}
+
 #save-section {
   margin-top: 24px;
 }

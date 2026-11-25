@@ -1,4 +1,3 @@
-import { notifySavedRowDeletion } from "./application/delete-row.js";
 import { buildDraft } from "./application/draft.js";
 import { createDraftRepository } from "./infrastructure/draft-repository.js";
 import { createOptionsRepository } from "./infrastructure/options-repository.js";
@@ -10,7 +9,7 @@ import { wireSchoolChangeDialog } from "./presentation/dialogs/school-change.js"
 import { getElement } from "./presentation/dom.js";
 import { createFeedback } from "./presentation/feedback.js";
 import { createIdentification } from "./presentation/identification.js";
-import { createSaveController } from "./presentation/save-controller.js";
+import { createSubmitController } from "./presentation/submit-controller.js";
 import { createThemeBlocks } from "./presentation/theme-blocks.js";
 
 function isWithinCollectionPeriod(period, now = new Date()) {
@@ -38,9 +37,11 @@ async function init() {
   });
 
   const feedback = createFeedback(getElement("survey-feedback-v3"));
-  const saveSection = getElement("save-section");
+  const submitSection = getElement("save-section");
   const schoolDialog = getElement("school-change-dialog");
   const deleteRowDialog = getElement("delete-row-dialog");
+  const noAcervoDialog = getElement("theme-no-acervo-dialog");
+  const noAcervoDescription = getElement("theme-no-acervo-description");
   const cddTooltip = createCddTooltip({
     button: getElement("cdd-form-info-button"),
     tooltip: getElement("cdd-tooltip"),
@@ -52,6 +53,7 @@ async function init() {
   let themeBlocks;
   let pendingSchool = null;
   let pendingDeleteRow = null;
+  let pendingNoAcervo = null;
   const collectionOpen = isWithinCollectionPeriod(options.collectionPeriod);
 
   function saveDraft() {
@@ -60,7 +62,6 @@ async function init() {
         form: identification.getFormValues(),
         school: identification.getSchool(),
         cdd: cddForm.getValues(),
-        cddMeta: cddForm.getMeta(),
         themes: themeBlocks.getDraftThemes(),
       })
     );
@@ -73,7 +74,7 @@ async function init() {
   function showSurveySections() {
     cddForm.show();
     themeBlocks.show();
-    saveSection.hidden = false;
+    submitSection.hidden = false;
   }
 
   function resetSurveyData() {
@@ -144,15 +145,22 @@ async function init() {
     themeBlocks.removeRow(row);
   }
 
-  function handleDeleteSavedRow(payload) {
-    const matricula = identification.getFormValues().matricula;
-    notifySavedRowDeletion({
-      gateway,
-      payload: {
-        ...payload,
-        matricula,
-      },
-    });
+  function handleNoAcervoRequest(request) {
+    pendingNoAcervo = request;
+    noAcervoDescription.textContent = `Os dados preenchidos em "${request.label}" serão descartados.`;
+    noAcervoDialog.showModal();
+  }
+
+  function cancelNoAcervo() {
+    pendingNoAcervo = null;
+    noAcervoDialog.close();
+  }
+
+  function confirmNoAcervo() {
+    const request = pendingNoAcervo;
+    pendingNoAcervo = null;
+    noAcervoDialog.close();
+    request?.onConfirm();
   }
 
   function handleIncompleteCleared() {
@@ -187,19 +195,19 @@ async function init() {
       saveDraft();
     },
     onDeleteRow: handleDeleteRowRequest,
-    onDeleteSavedRow: handleDeleteSavedRow,
+    onNoAcervoChange: handleNoAcervoRequest,
     onIncompleteCleared: handleIncompleteCleared,
   });
   themeBlocks.render();
 
-  const saveController = createSaveController({
+  const submitController = createSubmitController({
     identification,
     cddForm,
     themeBlocks,
     feedback,
-    saveButton: submitButton,
+    submitButton,
     gateway,
-    onSaveDraft: saveDraft,
+    onPersistDraft: saveDraft,
   });
 
   const state = draftRepository.load();
@@ -210,12 +218,7 @@ async function init() {
     state && typeof state.school === "string" ? state.school : ""
   );
 
-  cddForm.restore(
-    state && Array.isArray(state.cdd) ? state.cdd : null,
-    state && state.cddMeta && typeof state.cddMeta === "object"
-      ? state.cddMeta
-      : null
-  );
+  cddForm.restore(state && Array.isArray(state.cdd) ? state.cdd : null);
 
   themeBlocks.restore(
     state && state.themes && typeof state.themes === "object"
@@ -266,9 +269,18 @@ async function init() {
     },
   });
 
+  getElement("cancel-theme-no-acervo").addEventListener("click", cancelNoAcervo);
+  getElement("confirm-theme-no-acervo").addEventListener(
+    "click",
+    confirmNoAcervo
+  );
+  noAcervoDialog.addEventListener("close", () => {
+    pendingNoAcervo = null;
+  });
+
   cddForm.wireEvents();
   themeBlocks.wireEvents();
-  saveController.wireEvents();
+  submitController.wireEvents();
   cddTooltip.wireEvents();
 }
 

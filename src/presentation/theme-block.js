@@ -11,10 +11,8 @@ import {
   createInput,
   getControlValue,
   getRowControl,
-  getRowId,
   setControlValue,
 } from "./controls.js";
-import { renderSaveStatus } from "./save-status.js";
 
 export function getThemeRowControlMap(row) {
   const controls = {};
@@ -35,10 +33,6 @@ export function getThemeRowValues(row) {
   });
 
   return values;
-}
-
-export function getThemeRowSnapshot(row) {
-  return JSON.stringify(getThemeRowValues(row));
 }
 
 function themeRowValuesAreEmpty(values) {
@@ -72,24 +66,6 @@ function setThemeRowFlag(row, flagged) {
   });
 }
 
-function updateThemeRowSaveStatus(row) {
-  const status = row.querySelector(".save-status");
-
-  if (!status) {
-    return;
-  }
-
-  const values = getThemeRowValues(row);
-
-  renderSaveStatus(status, {
-    savedAt: row.dataset.savedAt,
-    savedSnapshot: row.dataset.savedSnapshot || "",
-    currentSnapshot: JSON.stringify(values),
-    saveError: row.dataset.saveError === "true",
-    empty: themeRowValuesAreEmpty(values),
-  });
-}
-
 function createThemeRow(theme, values = {}) {
   const row = document.createElement("tr");
   row.dataset.rowType = "theme";
@@ -102,18 +78,6 @@ function createThemeRow(theme, values = {}) {
 
   row.dataset.rowId =
     typeof meta.id === "string" && meta.id ? meta.id : generateRowId();
-
-  if (meta.savedAt) {
-    row.dataset.savedAt = String(meta.savedAt);
-  }
-
-  if (typeof meta.savedSnapshot === "string" && meta.savedSnapshot) {
-    row.dataset.savedSnapshot = meta.savedSnapshot;
-  }
-
-  if (meta.saveError) {
-    row.dataset.saveError = "true";
-  }
 
   THEME_COLUMNS.forEach((column) => {
     const cell = document.createElement("td");
@@ -130,15 +94,6 @@ function createThemeRow(theme, values = {}) {
   actionCell.append(createDeleteButton());
   row.append(actionCell);
 
-  const statusCell = document.createElement("td");
-  statusCell.className = "save-status-cell";
-  const status = document.createElement("span");
-  status.className = "save-status";
-  statusCell.append(status);
-  row.append(statusCell);
-
-  updateThemeRowSaveStatus(row);
-
   return row;
 }
 
@@ -147,6 +102,8 @@ export function createThemeBlock({
   index,
   initialRows,
   onAddRows,
+  onDataChange,
+  onNoAcervoChange,
 }) {
   const section = document.createElement("section");
   section.className = "card table-card theme-block";
@@ -184,12 +141,6 @@ export function createThemeBlock({
   actionsHeader.append(actionsLabel);
   headerRow.append(actionsHeader);
 
-  const statusHeader = document.createElement("th");
-  statusHeader.scope = "col";
-  statusHeader.className = "save-status-header";
-  statusHeader.textContent = "Status de salvamento";
-  headerRow.append(statusHeader);
-
   thead.append(headerRow);
 
   const tbody = document.createElement("tbody");
@@ -198,16 +149,35 @@ export function createThemeBlock({
   scroll.append(table);
 
   const actions = document.createElement("div");
-  actions.className = "table-actions";
+  actions.className = "table-actions theme-block-actions";
+
+  const noAcervoLabel = document.createElement("label");
+  noAcervoLabel.className = "theme-no-acervo";
+
+  const noAcervoCheckbox = document.createElement("input");
+  noAcervoCheckbox.type = "checkbox";
+  noAcervoCheckbox.className = "row-checkbox theme-no-acervo-checkbox";
+  noAcervoCheckbox.autocomplete = "off";
+  noAcervoCheckbox.setAttribute(
+    "aria-label",
+    `Não possuímos acervo com essa temática: ${theme.label}`
+  );
+
+  const noAcervoText = document.createElement("span");
+  noAcervoText.textContent = "Não possuímos acervo com essa temática";
+
+  noAcervoLabel.append(noAcervoCheckbox, noAcervoText);
 
   const addButton = document.createElement("button");
   addButton.type = "button";
   addButton.className = "btn btn-secondary add-theme-rows";
   addButton.textContent = "Adicionar 10 linhas";
   addButton.addEventListener("click", onAddRows);
-  actions.append(addButton);
 
+  actions.append(noAcervoLabel, addButton);
   section.append(heading, scroll, actions);
+
+  let semAcervo = false;
 
   function getRows() {
     return Array.from(tbody.querySelectorAll("tr"));
@@ -221,13 +191,68 @@ export function createThemeBlock({
     }
 
     tbody.append(fragment);
+    applySemAcervoState();
   }
 
-  function updateAllStatuses() {
-    getRows().forEach(updateThemeRowSaveStatus);
+  function applySemAcervoState() {
+    noAcervoCheckbox.checked = semAcervo;
+    addButton.disabled = semAcervo;
+
+    getRows().forEach((row) => {
+      Object.values(getThemeRowControlMap(row)).forEach((control) => {
+        if (control) {
+          control.disabled = semAcervo;
+        }
+      });
+
+      const deleteButton = row.querySelector(".delete-row-button");
+      if (deleteButton) {
+        deleteButton.disabled = semAcervo;
+      }
+    });
   }
+
+  function setSemAcervo(value) {
+    semAcervo = Boolean(value);
+    applySemAcervoState();
+  }
+
+  function clearRows() {
+    tbody.replaceChildren();
+    appendRows(1);
+  }
+
+  function handleNoAcervoChange() {
+    const checked = noAcervoCheckbox.checked;
+
+    if (checked && hasData()) {
+      noAcervoCheckbox.checked = false;
+
+      onNoAcervoChange?.({
+        themeId: theme.id,
+        label: theme.label,
+        onConfirm: () => {
+          setSemAcervo(true);
+          clearRows();
+          onDataChange();
+        },
+      });
+      return;
+    }
+
+    setSemAcervo(checked);
+
+    if (checked) {
+      clearRows();
+    }
+
+    onDataChange();
+  }
+
+  noAcervoCheckbox.addEventListener("change", handleNoAcervoChange);
 
   function clearFlags() {
+    section.classList.remove("theme-incomplete");
     tbody.querySelectorAll("tr.row-incomplete").forEach((row) => {
       setThemeRowFlag(row, false);
     });
@@ -238,44 +263,55 @@ export function createThemeBlock({
   }
 
   function hasData() {
-    return getRows().some((row) => getThemeRowState(row) !== "empty");
+    return (
+      semAcervo ||
+      getRows().some((row) => getThemeRowState(row) !== "empty")
+    );
+  }
+
+  function hasCompleteRow() {
+    return getRows().some((row) => getThemeRowState(row) === "complete");
+  }
+
+  function markIncomplete() {
+    section.classList.toggle(
+      "theme-incomplete",
+      !semAcervo && !hasCompleteRow()
+    );
   }
 
   function getRowsForPayload() {
-    return getRows().map((row) => ({
-      ...getThemeRowValues(row),
-      rowId: getRowId(row),
-    }));
+    return getRows().map((row) => getThemeRowValues(row));
   }
 
-  function getDraftRows() {
+  function getRowsForDraft() {
     return getRows().map((row) => ({
       ...getThemeRowValues(row),
-      _meta: {
-        id: getRowId(row),
-        savedAt: row.dataset.savedAt || null,
-        savedSnapshot: row.dataset.savedSnapshot || null,
-        saveError: row.dataset.saveError === "true",
-      },
+      _meta: { id: row.dataset.rowId },
     }));
   }
 
   function reset() {
+    semAcervo = false;
     tbody.replaceChildren();
     appendRows(initialRows);
+    clearFlags();
   }
 
-  function restore(rows) {
+  function restore(rows, restoredSemAcervo) {
+    semAcervo = Boolean(restoredSemAcervo);
     tbody.replaceChildren();
 
     if (rows.length > 0) {
       rows.forEach((values) => {
         tbody.append(createThemeRow(theme, values));
       });
-      return;
+    } else {
+      appendRows(initialRows);
     }
 
-    appendRows(initialRows);
+    applySemAcervoState();
+    clearFlags();
   }
 
   function collectPartialRows() {
@@ -299,44 +335,6 @@ export function createThemeBlock({
     if (getThemeRowState(row) !== "partial") {
       setThemeRowFlag(row, false);
     }
-  }
-
-  function getRowSnapshots(target) {
-    getRows().forEach((row) => {
-      if (getThemeRowState(row) !== "empty") {
-        target.set(getRowId(row), getThemeRowSnapshot(row));
-      }
-    });
-  }
-
-  function markError() {
-    getRows().forEach((row) => {
-      if (getThemeRowState(row) !== "empty") {
-        row.dataset.saveError = "true";
-        updateThemeRowSaveStatus(row);
-      }
-    });
-  }
-
-  function applySaveSuccess(savedAt, rowSnapshots) {
-    getRows().forEach((row) => {
-      delete row.dataset.saveError;
-
-      if (getThemeRowState(row) === "empty") {
-        updateThemeRowSaveStatus(row);
-        return;
-      }
-
-      const sentSnapshot = rowSnapshots.get(getRowId(row));
-      const currentSnapshot = getThemeRowSnapshot(row);
-
-      if (sentSnapshot && sentSnapshot === currentSnapshot) {
-        row.dataset.savedAt = String(savedAt);
-        row.dataset.savedSnapshot = currentSnapshot;
-      }
-
-      updateThemeRowSaveStatus(row);
-    });
   }
 
   function sanitizeTextFields() {
@@ -396,23 +394,22 @@ export function createThemeBlock({
     tbody,
     getRows,
     appendRows,
-    updateAllStatuses,
     clearFlags,
     hasEmptyRow,
     hasData,
+    hasCompleteRow,
+    hasSemAcervo: () => semAcervo,
+    markIncomplete,
+    setSemAcervo,
     getRowsForPayload,
-    getDraftRows,
+    getRowsForDraft,
     reset,
     restore,
     collectPartialRows,
     collectDuplicateTitleRows,
     refreshRowFlag,
-    getRowSnapshots,
-    markError,
-    applySaveSuccess,
     sanitizeTextFields,
     show,
     isRowEmpty: (row) => getThemeRowState(row) === "empty",
-    updateRowStatus: updateThemeRowSaveStatus,
   };
 }

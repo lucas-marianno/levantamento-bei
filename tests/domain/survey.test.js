@@ -16,6 +16,7 @@ test("buildSurveyPayloadV3 sanitizes the name and filters empty book rows", () =
       {
         id: "indigena",
         label: "Temática Indígena",
+        semAcervo: false,
         rows: [
           {
             titulo: "Livro",
@@ -39,6 +40,7 @@ test("buildSurveyPayloadV3 sanitizes the name and filters empty book rows", () =
       {
         id: "indigena",
         label: "Temática Indígena",
+        semAcervo: false,
         livros: [
           {
             titulo: "Livro",
@@ -61,12 +63,50 @@ test("buildSurveyPayloadV3 keeps themes with no filled rows", () => {
       {
         id: "africana",
         label: "Temática Africana",
+        semAcervo: false,
         rows: [{ titulo: "", autor: "", editora: "", quantidade: "" }],
       },
     ],
   });
 
   assert.deepEqual(payload.temas, [
-    { id: "africana", label: "Temática Africana", livros: [] },
+    {
+      id: "africana",
+      label: "Temática Africana",
+      semAcervo: false,
+      livros: [],
+    },
+  ]);
+});
+
+test("buildSurveyPayloadV3 omits books when a theme has no collection", () => {
+  const payload = buildSurveyPayloadV3({
+    form: { responsavel: "Maria", cargo: "Diretor", matricula: "12345" },
+    school: "Escola A",
+    cdd: [],
+    themes: [
+      {
+        id: "africana",
+        label: "Temática Africana",
+        semAcervo: true,
+        rows: [
+          {
+            titulo: "Livro",
+            autor: "Autor",
+            editora: "Editora",
+            quantidade: "2",
+          },
+        ],
+      },
+    ],
+  });
+
+  assert.deepEqual(payload.temas, [
+    {
+      id: "africana",
+      label: "Temática Africana",
+      semAcervo: true,
+      livros: [],
+    },
   ]);
 });

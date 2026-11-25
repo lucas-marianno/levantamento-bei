@@ -143,19 +143,16 @@
         </table>
       </div>
 
-      <div class="cdd-form-footer">
-        <span id="cdd-form-status" class="save-status"></span>
-      </div>
     </section>
 
     <div id="theme-blocks"></div>
 
     <section id="save-section" class="card" hidden aria-labelledby="save-title">
-      <h2 id="save-title" class="sr-only">Salvar levantamento</h2>
+      <h2 id="save-title" class="sr-only">Enviar resposta</h2>
 
       <div class="table-actions save-actions">
         <button type="button" id="submit-survey-v3" class="btn btn-primary">
-          Salvar
+          Enviar resposta
         </button>
       </div>
 
@@ -206,9 +203,6 @@
       <p id="delete-row-description">
         A linha selecionada será removida da tabela.
       </p>
-      <p class="warning-note">
-        Se a linha já foi salva, também será excluída do servidor.
-      </p>
 
       <div class="dialog-actions">
         <button type="button" id="cancel-delete-row" class="btn btn-secondary">
@@ -221,38 +215,32 @@
     </div>
   </dialog>
 
-  <!-- TODO: wire this dialog to the retry flow when the backend is available. -->
   <dialog
-    id="save-error-dialog"
-    class="warning-dialog save-error-dialog"
-    aria-labelledby="save-error-title"
-    aria-describedby="save-error-description"
+    id="theme-no-acervo-dialog"
+    class="warning-dialog"
+    aria-labelledby="theme-no-acervo-title"
+    aria-describedby="theme-no-acervo-description"
   >
     <div class="warning-content">
       <div class="warning-icon" aria-hidden="true">!</div>
-      <h2 id="save-error-title">Não foi possível salvar</h2>
-      <p id="save-error-description">
-        Ocorreu um erro ao salvar o levantamento.
-      </p>
-      <p class="warning-note" id="save-error-local-note">
-        Suas alterações estão salvas neste navegador e não serão perdidas.
-      </p>
-
-      <div class="retry-details" id="save-retry-details">
-        <p>Tentativas de reenvio: <strong id="save-retry-count">0</strong></p>
-        <p>
-          Próxima tentativa automática em
-          <strong id="save-retry-countdown">--</strong>.
-        </p>
-      </div>
-
-      <p class="warning-note" id="save-error-final-message" hidden>
-        Tente novamente mais tarde.
-      </p>
+      <h2 id="theme-no-acervo-title">Descartar dados do tema?</h2>
+      <p id="theme-no-acervo-description"></p>
+      <p class="warning-note">Essa ação não pode ser desfeita.</p>
 
       <div class="dialog-actions">
-        <button type="button" id="cancel-save-retry" class="btn btn-secondary">
-          Cancelar envio
+        <button
+          type="button"
+          id="cancel-theme-no-acervo"
+          class="btn btn-secondary"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          id="confirm-theme-no-acervo"
+          class="btn btn-danger"
+        >
+          Descartar e marcar
         </button>
       </div>
     </div>

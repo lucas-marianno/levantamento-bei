@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   getIdentificationValidity,
   getInvalidCddRanges,
+  getThemesWithoutValidRows,
   isIdentificationValid,
 } from "../../src/domain/validation.js";
 
@@ -41,5 +42,53 @@ test("CDD rows are valid when marked unavailable or with a positive quantity", (
       { range: "300-399", quantidade: 1.5, semAcervo: false },
     ]),
     ["200-299", "300-399"]
+  );
+});
+
+test("themes require a complete row unless they are marked without collection", () => {
+  const completeBook = {
+    titulo: "Livro",
+    autor: "Autor",
+    editora: "Editora",
+    quantidade: "2",
+  };
+
+  assert.deepEqual(
+    getThemesWithoutValidRows([
+      {
+        id: "indigena",
+        label: "Temática Indígena",
+        semAcervo: false,
+        rows: [completeBook],
+      },
+      {
+        id: "africana",
+        label: "Temática Africana",
+        semAcervo: true,
+        rows: [],
+      },
+    ]),
+    []
+  );
+
+  assert.deepEqual(
+    getThemesWithoutValidRows([
+      {
+        id: "indigena",
+        label: "Temática Indígena",
+        semAcervo: false,
+        rows: [{ titulo: "", autor: "", editora: "", quantidade: "" }],
+      },
+      {
+        id: "africana",
+        label: "Temática Africana",
+        semAcervo: false,
+        rows: [{ ...completeBook, quantidade: "" }],
+      },
+    ]),
+    [
+      { id: "indigena", label: "Temática Indígena" },
+      { id: "africana", label: "Temática Africana" },
+    ]
   );
 });

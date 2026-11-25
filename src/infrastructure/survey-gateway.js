@@ -4,31 +4,12 @@ export function createSurveyGateway({ supabase, functionNames } = {}) {
   const client = createEdgeFunctionsClient(supabase);
   const functions = {
     whitelist: "is_user_whitelisted",
-    saveSurvey: "save_survey",
-    deleteThemeRow: "delete_theme_row",
+    submitResponse: "submit_response",
     ...(functionNames || {}),
   };
 
-  async function sendSurveyToBackend(payload, options = {}) {
-    return client.invoke(functions.saveSurvey, payload, options);
-  }
-
-  async function deleteBookRow(payload) {
-    const matricula =
-      typeof payload?.matricula === "number"
-        ? payload.matricula
-        : Number(String(payload?.matricula ?? "").trim());
-    const clientRowId =
-      payload?.clientRowId ?? payload?.rowId ?? payload?.client_row_id;
-
-    if (!Number.isInteger(matricula) || !clientRowId) {
-      return { success: false, message: "Dados insuficientes para exclusão." };
-    }
-
-    return client.invoke(functions.deleteThemeRow, {
-      matricula,
-      clientRowId,
-    });
+  async function submitResponse(payload, options = {}) {
+    return client.invoke(functions.submitResponse, payload, options);
   }
 
   async function isUserWhitelisted(matricula) {
@@ -46,8 +27,7 @@ export function createSurveyGateway({ supabase, functionNames } = {}) {
   }
 
   return {
-    sendSurveyToBackend,
-    deleteBookRow,
+    submitResponse,
     isUserWhitelisted,
   };
 }

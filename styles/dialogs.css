@@ -50,31 +50,6 @@
   font-size: 0.9rem;
 }
 
-.save-error-dialog {
-  border-top-color: var(--brand-orange-dark);
-}
-
-.retry-details {
-  margin-top: 18px;
-  padding: 12px 14px;
-  background: #fff1e6;
-  border: 1px solid #f4c39f;
-  border-radius: 10px;
-}
-
-.retry-details p {
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.retry-details p + p {
-  margin-top: 6px;
-}
-
-.retry-details strong {
-  color: var(--brand-orange-dark);
-}
-
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

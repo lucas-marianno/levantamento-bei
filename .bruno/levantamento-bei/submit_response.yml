@@ -1,0 +1,51 @@
+info:
+  name: submit_response
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: https://jxndblpwvxbtqcuxwlpr.supabase.co/functions/v1/submit_response
+  headers:
+    - name: Authorization
+      value: Bearer sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ
+    - name: apikey
+      value: sb_publishable_nLcI8fZSW1AbIdyjQpQqNA_s92Yy4tQ
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "responsavel": "MARIA",
+        "cargo": "Diretor",
+        "matricula": 12345,
+        "escola": "Caetano de Campos - EMEB",
+        "cdd": [
+          { "range": "000-099", "color": "BRANCA", "label": "Generalidades", "quantidade": 10, "semAcervo": false },
+          { "range": "100-299", "color": "AMARELA", "label": "Filosofia e Religião", "quantidade": 0, "semAcervo": true }
+        ],
+        "temas": [
+          {
+            "id": "indigena",
+            "label": "Temática Indígena",
+            "semAcervo": false,
+            "livros": [
+              { "titulo": "LIVRO", "autor": "AUTOR", "editora": "EDITORA", "quantidade": 2 }
+            ]
+          },
+          {
+            "id": "africana",
+            "label": "Temática Africana",
+            "semAcervo": true,
+            "livros": []
+          }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

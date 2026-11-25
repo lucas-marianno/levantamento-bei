@@ -33,11 +33,3 @@
   width: 180px;
   text-align: center;
 }
-
-.cdd-form-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
-}

@@ -1,7 +1,7 @@
 export const V3_STORAGE_KEY = "registro-livros:v3:draft";
-export const V3_DRAFT_VERSION = 3;
-export const SAVE_LABEL = "Salvar";
-export const SAVE_IN_PROGRESS_LABEL = "Salvando...";
+export const V3_DRAFT_VERSION = 4;
+export const SUBMIT_LABEL = "Enviar resposta";
+export const SUBMIT_IN_PROGRESS_LABEL = "Enviando...";
 export const OPTIONS_URL = "data/options.json";
 
 export const FALLBACK_OPTIONS = {

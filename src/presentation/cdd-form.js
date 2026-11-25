@@ -1,19 +1,11 @@
 import { COLOR_OPTIONS } from "../config.js";
 import { getInvalidCddRanges } from "../domain/validation.js";
 import { getElement } from "./dom.js";
-import { renderSaveStatus } from "./save-status.js";
 
 export function createCddForm({ categories, onDataChange }) {
   const section = getElement("cdd-form-section");
   const body = getElement("cdd-form-body");
-  const status = getElement("cdd-form-status");
-
   const rows = [];
-  let meta = {
-    savedAt: null,
-    savedSnapshot: null,
-    saveError: false,
-  };
 
   function createRow(category, index) {
     const row = document.createElement("tr");
@@ -88,25 +80,6 @@ export function createCddForm({ categories, onDataChange }) {
     }));
   }
 
-  function getSnapshot() {
-    return JSON.stringify(
-      rows.map(({ category, checkbox, quantityInput }) => ({
-        range: category.range,
-        quantidade: checkbox.checked ? 0 : Number(quantityInput.value) || 0,
-        semAcervo: checkbox.checked,
-      }))
-    );
-  }
-
-  function updateStatus() {
-    renderSaveStatus(status, {
-      savedAt: meta.savedAt,
-      savedSnapshot: meta.savedSnapshot,
-      currentSnapshot: getSnapshot(),
-      saveError: meta.saveError,
-    });
-  }
-
   function render() {
     rows.length = 0;
     body.replaceChildren();
@@ -118,46 +91,34 @@ export function createCddForm({ categories, onDataChange }) {
     });
 
     body.append(fragment);
-    updateStatus();
   }
 
-  function restore(items, cddMeta) {
-    if (Array.isArray(items)) {
-      items.forEach((item) => {
-        if (!item || typeof item !== "object") {
-          return;
-        }
-
-        const entry = rows.find(
-          (candidate) => candidate.category.range === item.range
-        );
-
-        if (!entry) {
-          return;
-        }
-
-        entry.checkbox.checked = Boolean(item.semAcervo);
-        entry.quantityInput.disabled = entry.checkbox.checked;
-
-        const quantity = Number(item.quantidade);
-        entry.quantityInput.value = String(
-          Number.isInteger(quantity) && quantity >= 0 ? quantity : 0
-        );
-      });
+  function restore(items) {
+    if (!Array.isArray(items)) {
+      return;
     }
 
-    if (cddMeta && typeof cddMeta === "object") {
-      meta = {
-        savedAt: cddMeta.savedAt || null,
-        savedSnapshot:
-          typeof cddMeta.savedSnapshot === "string"
-            ? cddMeta.savedSnapshot
-            : null,
-        saveError: Boolean(cddMeta.saveError),
-      };
-    }
+    items.forEach((item) => {
+      if (!item || typeof item !== "object") {
+        return;
+      }
 
-    updateStatus();
+      const entry = rows.find(
+        (candidate) => candidate.category.range === item.range
+      );
+
+      if (!entry) {
+        return;
+      }
+
+      entry.checkbox.checked = Boolean(item.semAcervo);
+      entry.quantityInput.disabled = entry.checkbox.checked;
+
+      const quantity = Number(item.quantidade);
+      entry.quantityInput.value = String(
+        Number.isInteger(quantity) && quantity >= 0 ? quantity : 0
+      );
+    });
   }
 
   function clearFlags() {
@@ -225,7 +186,6 @@ export function createCddForm({ categories, onDataChange }) {
       }
     }
 
-    updateStatus();
     onDataChange();
   }
 
@@ -240,36 +200,6 @@ export function createCddForm({ categories, onDataChange }) {
       quantityInput.value = "0";
       quantityInput.removeAttribute("aria-invalid");
     });
-
-    meta = {
-      savedAt: null,
-      savedSnapshot: null,
-      saveError: false,
-    };
-
-    updateStatus();
-  }
-
-  function getMeta() {
-    return {
-      savedAt: meta.savedAt,
-      savedSnapshot: meta.savedSnapshot,
-      saveError: meta.saveError,
-    };
-  }
-
-  function applySaveSuccess(savedAt, cddSnapshot) {
-    meta = {
-      savedAt,
-      savedSnapshot: cddSnapshot,
-      saveError: false,
-    };
-    updateStatus();
-  }
-
-  function markError() {
-    meta.saveError = true;
-    updateStatus();
   }
 
   function show() {
@@ -284,17 +214,12 @@ export function createCddForm({ categories, onDataChange }) {
   return {
     render,
     restore,
-    updateStatus,
     clearFlags,
     validate,
     scrollToFirstInvalid,
     getValues,
-    getSnapshot,
-    getMeta,
     hasData,
     reset,
-    applySaveSuccess,
-    markError,
     show,
     wireEvents,
   };

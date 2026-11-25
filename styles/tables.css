@@ -21,10 +21,6 @@ table {
   width: 54px;
 }
 
-.save-status-header {
-  width: 240px;
-}
-
 thead th {
   position: sticky;
   top: 0;
@@ -155,31 +151,6 @@ td input[type="checkbox"].row-checkbox {
 td input[type="checkbox"].row-checkbox:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(54, 92, 170, 0.3);
-}
-
-.save-status-cell {
-  width: 240px;
-  padding: 9px 10px;
-}
-
-.save-status {
-  display: block;
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.save-status.saved {
-  color: #0b5a27;
-}
-
-.save-status.pending {
-  color: #8a5a00;
-}
-
-.save-status.error {
-  color: var(--brand-orange-dark);
 }
 
 td input:disabled,

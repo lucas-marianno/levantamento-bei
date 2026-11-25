@@ -1,6 +1,5 @@
 import {
   createThemeBlock,
-  getThemeRowValues,
 } from "./theme-block.js";
 import { getElement } from "./dom.js";
 
@@ -9,7 +8,7 @@ export function createThemeBlocks({
   initialRows,
   onDataChange,
   onDeleteRow,
-  onDeleteSavedRow,
+  onNoAcervoChange,
   onIncompleteCleared,
 }) {
   const container = getElement("theme-blocks");
@@ -40,6 +39,8 @@ export function createThemeBlocks({
           appendRows(theme.id, 10);
           onDataChange();
         },
+        onDataChange,
+        onNoAcervoChange,
       });
 
       blocks.set(theme.id, block);
@@ -55,11 +56,16 @@ export function createThemeBlocks({
 
   function restore(themeState) {
     blocks.forEach((block, themeId) => {
-      const rows = Array.isArray(themeState[themeId])
-        ? themeState[themeId]
-        : [];
+      const entry = themeState[themeId];
+      const state =
+        entry && typeof entry === "object" && !Array.isArray(entry)
+          ? entry
+          : { semAcervo: false, rows: Array.isArray(entry) ? entry : [] };
 
-      block.restore(rows);
+      block.restore(
+        Array.isArray(state.rows) ? state.rows : [],
+        state.semAcervo
+      );
     });
   }
 
@@ -83,7 +89,10 @@ export function createThemeBlocks({
     const themesState = {};
 
     blocks.forEach((block, themeId) => {
-      themesState[themeId] = block.getDraftRows();
+      themesState[themeId] = {
+        semAcervo: block.hasSemAcervo(),
+        rows: block.getRowsForDraft(),
+      };
     });
 
     return themesState;
@@ -93,18 +102,9 @@ export function createThemeBlocks({
     return Array.from(blocks.values()).map((block) => ({
       id: block.theme.id,
       label: block.theme.label,
+      semAcervo: block.hasSemAcervo(),
       rows: block.getRowsForPayload(),
     }));
-  }
-
-  function getRowSnapshots() {
-    const snapshots = new Map();
-
-    blocks.forEach((block) => {
-      block.getRowSnapshots(snapshots);
-    });
-
-    return snapshots;
   }
 
   function collectPartialGroups() {
@@ -125,12 +125,22 @@ export function createThemeBlocks({
     const groups = [];
 
     blocks.forEach((block) => {
-      const duplicates = block.collectDuplicateTitleRows
-        ? block.collectDuplicateTitleRows()
-        : [];
+      const duplicates = block.collectDuplicateTitleRows();
 
       if (duplicates.length > 0) {
         groups.push({ block, duplicates });
+      }
+    });
+
+    return groups;
+  }
+
+  function collectEmptyGroups() {
+    const groups = [];
+
+    blocks.forEach((block) => {
+      if (!block.hasSemAcervo() && !block.hasCompleteRow()) {
+        groups.push({ block });
       }
     });
 
@@ -143,27 +153,15 @@ export function createThemeBlocks({
     });
   }
 
-  function updateAllStatuses() {
+  function markEmptyThemes() {
     blocks.forEach((block) => {
-      block.updateAllStatuses();
+      block.markIncomplete();
     });
   }
 
   function sanitizeTextFields() {
     blocks.forEach((block) => {
       block.sanitizeTextFields();
-    });
-  }
-
-  function markErrors() {
-    blocks.forEach((block) => {
-      block.markError();
-    });
-  }
-
-  function applySaveSuccess(savedAt, rowSnapshots) {
-    blocks.forEach((block) => {
-      block.applySaveSuccess(savedAt, rowSnapshots);
     });
   }
 
@@ -198,38 +196,20 @@ export function createThemeBlocks({
 
     const block = getBlockByRow(row);
 
-    if (block) {
-      block.updateRowStatus(row);
+    if (!block) {
+      return;
     }
 
     refreshFlaggedRow(row);
 
-    if (block && !block.hasEmptyRow()) {
+    if (!block.hasSemAcervo() && !block.hasEmptyRow()) {
       appendRows(block.theme.id, 1);
     }
 
     onDataChange();
   }
 
-  function notifySavedRowDeletion(row) {
-    if (!Number(row.dataset.savedAt)) {
-      return;
-    }
-
-    const block = getBlockByRow(row);
-    const rowPayload = {
-      rowId: row.dataset.rowId,
-      themeId: row.dataset.themeId,
-      themeLabel: block?.theme.label ?? "",
-      ...getThemeRowValues(row),
-    };
-
-    onDeleteSavedRow(rowPayload);
-  }
-
   function removeRow(row) {
-    notifySavedRowDeletion(row);
-
     const block = getBlockByRow(row);
     row.remove();
 
@@ -253,7 +233,7 @@ export function createThemeBlocks({
 
     const deleteButton = target.closest(".delete-row-button");
 
-    if (!deleteButton) {
+    if (!deleteButton || deleteButton.disabled) {
       return;
     }
 
@@ -287,14 +267,12 @@ export function createThemeBlocks({
     hasData,
     getDraftThemes,
     getThemesForPayload,
-    getRowSnapshots,
     collectPartialGroups,
     collectDuplicateTitleGroups,
+    collectEmptyGroups,
     clearFlags,
-    updateAllStatuses,
+    markEmptyThemes,
     sanitizeTextFields,
-    markErrors,
-    applySaveSuccess,
     removeRow,
     wireEvents,
   };

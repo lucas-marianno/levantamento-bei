@@ -1,8 +1,10 @@
+import { THEME_COLUMNS } from "../config.js";
 import {
   isValidCargo,
   isValidMatricula,
   isValidName,
 } from "./identification.js";
+import { getRowState } from "./rows.js";
 
 export function getIdentificationValidity({ name, cargo, matricula }) {
   return {
@@ -23,4 +25,18 @@ export function getInvalidCddRanges(items) {
         !(item.semAcervo || (Number.isInteger(item.quantidade) && item.quantidade > 0))
     )
     .map((item) => item.range);
+}
+
+export function getThemesWithoutValidRows(themes) {
+  return themes
+    .filter((theme) => {
+      if (theme.semAcervo) {
+        return false;
+      }
+
+      return !theme.rows.some(
+        (row) => getRowState(THEME_COLUMNS, row) === "complete"
+      );
+    })
+    .map(({ id, label }) => ({ id, label }));
 }

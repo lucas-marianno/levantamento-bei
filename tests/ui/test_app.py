@@ -1,5 +1,6 @@
 import functools
 import http.server
+import json
 import os
 import threading
 import unittest
@@ -63,6 +64,7 @@ class AppUiTest(unittest.TestCase):
         )
         self.page = self.context.new_page()
         self.console_errors = []
+        self.submitted_payloads = []
         self.page.on("pageerror", lambda error: self.console_errors.append(str(error)))
         self.page.on(
             "console",
@@ -72,11 +74,42 @@ class AppUiTest(unittest.TestCase):
                 else None
             ),
         )
+        self.page.route("**/functions/v1/**", self._handle_function_request)
         self.page.goto(self.base_url, wait_until="networkidle")
 
     def tearDown(self):
         self.assertEqual(self.console_errors, [])
         self.context.close()
+
+    def _handle_function_request(self, route):
+        url = route.request.url
+
+        if url.endswith("/is_user_whitelisted"):
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body="true",
+            )
+            return
+
+        if url.endswith("/submit_response"):
+            data = route.request.post_data
+            if data:
+                self.submitted_payloads.append(json.loads(data))
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps(
+                    {
+                        "success": True,
+                        "id": "00000000-0000-0000-0000-000000000001",
+                        "submittedAt": "2026-11-25T12:00:00.000Z",
+                    }
+                ),
+            )
+            return
+
+        route.continue_()
 
     def fill_identification(self, name="Maria", cargo="Diretor", matricula="12345"):
         self.page.fill("#responsavel", name)
@@ -84,23 +117,22 @@ class AppUiTest(unittest.TestCase):
         self.page.select_option("#cargo", cargo)
         self.page.fill("#matricula", matricula)
         self.page.locator("#matricula").blur()
+        expect(self.page.locator("#escola")).to_be_enabled()
 
     def select_school(self, index=1):
         self.page.select_option("#escola", index=index)
 
-    def fill_theme_rows(self, block_index=0):
-        block = self.page.locator(".theme-block").nth(block_index)
-        rows = block.locator("tbody tr")
-        count = rows.count()
-
-        for index in range(count):
-            row = rows.nth(index)
-            row.locator('[data-column-key="titulo"]').fill(f"Livro {index}")
-            row.locator('[data-column-key="autor"]').fill(f"Autor {index}")
-            row.locator('[data-column-key="editora"]').fill(f"Editora {index}")
-            quantity = row.locator('[data-column-key="quantidade"]')
-            quantity.fill("2")
-            quantity.dispatch_event("change")
+    def fill_theme_row(self, block_index=0, row_index=0, title="Livro"):
+        row = self.page.locator(".theme-block").nth(block_index).locator(
+            "tbody tr"
+        ).nth(row_index)
+        row.locator('[data-column-key="titulo"]').fill(title)
+        row.locator('[data-column-key="autor"]').fill("Autor")
+        row.locator('[data-column-key="editora"]').fill("Editora")
+        quantity = row.locator('[data-column-key="quantidade"]')
+        quantity.fill("2")
+        quantity.dispatch_event("change")
+        return row
 
     def test_initial_render(self):
         page = self.page
@@ -108,6 +140,7 @@ class AppUiTest(unittest.TestCase):
         self.assertEqual(page.locator("#escola option").count(), 179)
         self.assertEqual(page.locator("#cdd-form-body tr").count(), 8)
         self.assertEqual(page.locator(".theme-block").count(), 2)
+        self.assertEqual(page.locator(".theme-no-acervo-checkbox").count(), 2)
         self.assertEqual(page.locator(".theme-table tbody tr").count(), 10)
         self.assertTrue(page.locator("#cdd-form-section").is_hidden())
         self.assertTrue(page.locator("#save-section").is_hidden())
@@ -145,7 +178,7 @@ class AppUiTest(unittest.TestCase):
         page.locator("#matricula").blur()
 
         self.assertEqual(page.input_value("#matricula"), "12345")
-        self.assertFalse(page.locator("#escola").is_disabled())
+        expect(page.locator("#escola")).to_be_enabled()
         self.assertTrue(page.locator("#escola-hint").is_hidden())
         self.assertTrue(page.locator("#matricula-error").is_hidden())
 
@@ -163,10 +196,12 @@ class AppUiTest(unittest.TestCase):
         draft = page.evaluate(
             "() => JSON.parse(localStorage.getItem('registro-livros:v3:draft'))"
         )
-        self.assertEqual(draft["version"], 3)
+        self.assertEqual(draft["version"], 4)
         self.assertEqual(draft["school"], school)
         self.assertEqual(draft["form"]["responsavel"], "MARIA")
         self.assertEqual(draft["form"]["matricula"], "12345")
+        self.assertNotIn("cddMeta", draft)
+        self.assertIn("semAcervo", draft["themes"]["indigena"])
 
         page.reload(wait_until="networkidle")
 
@@ -185,7 +220,6 @@ class AppUiTest(unittest.TestCase):
         first_quantity = page.locator(".cdd-quantity-input").nth(0)
         first_quantity.fill("3")
         first_quantity.dispatch_event("change")
-        expect(page.locator("#cdd-form-status")).to_have_text("Entrada não salva")
 
         second_checkbox = page.locator(".cdd-unavailable-checkbox").nth(1)
         second_checkbox.check()
@@ -196,12 +230,9 @@ class AppUiTest(unittest.TestCase):
         first_block = page.locator(".theme-block").nth(0)
         self.assertEqual(first_block.locator("tbody tr").count(), 5)
 
-        self.fill_theme_rows(block_index=0)
+        self.fill_theme_row(block_index=0, row_index=0, title="Livro 0")
 
-        expect(first_block.locator("tbody tr")).to_have_count(6)
-        expect(
-            first_block.locator("tbody tr").nth(0).locator(".save-status")
-        ).to_have_text("Entrada não salva")
+        expect(first_block.locator("tbody tr")).to_have_count(5)
 
         second_block = page.locator(".theme-block").nth(1)
         self.assertEqual(second_block.locator("tbody tr").count(), 5)
@@ -212,16 +243,88 @@ class AppUiTest(unittest.TestCase):
         expect(page.locator("#delete-row-dialog")).to_be_visible()
         page.click("#cancel-delete-row")
         expect(page.locator("#delete-row-dialog")).to_be_hidden()
-        expect(first_block.locator("tbody tr")).to_have_count(6)
+        expect(first_block.locator("tbody tr")).to_have_count(5)
 
         first_block.locator("tbody tr").nth(0).locator(".delete-row-button").click()
         page.click("#confirm-delete-row")
-        expect(first_block.locator("tbody tr")).to_have_count(5)
+        expect(first_block.locator("tbody tr")).to_have_count(4)
 
         page.locator(".theme-block").nth(1).locator(".add-theme-rows").click()
         expect(second_block.locator("tbody tr")).to_have_count(14)
 
-    def test_save_validation_then_success(self):
+    def test_theme_without_collection_checkbox(self):
+        page = self.page
+        self.fill_identification()
+        self.select_school()
+
+        first_block = page.locator(".theme-block").nth(0)
+        self.fill_theme_row(block_index=0, row_index=0)
+        page.click(".theme-block:nth-of-type(1) .theme-no-acervo-checkbox")
+
+        expect(page.locator("#theme-no-acervo-dialog")).to_be_visible()
+        page.click("#cancel-theme-no-acervo")
+        expect(page.locator("#theme-no-acervo-dialog")).to_be_hidden()
+        self.assertFalse(
+            first_block.locator(".theme-no-acervo-checkbox").is_checked()
+        )
+        self.assertEqual(
+            first_block.locator('[data-column-key="titulo"]').nth(0).input_value(),
+            "LIVRO",
+        )
+
+        page.click(".theme-block:nth-of-type(1) .theme-no-acervo-checkbox")
+        page.click("#confirm-theme-no-acervo")
+
+        expect(page.locator("#theme-no-acervo-dialog")).to_be_hidden()
+        self.assertTrue(first_block.locator(".theme-no-acervo-checkbox").is_checked())
+        self.assertTrue(
+            first_block.locator('[data-column-key="titulo"]').nth(0).is_disabled()
+        )
+        self.assertTrue(first_block.locator(".add-theme-rows").is_disabled())
+        expect(first_block.locator("tbody tr")).to_have_count(1)
+
+        draft = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('registro-livros:v3:draft'))"
+        )
+        self.assertTrue(draft["themes"]["indigena"]["semAcervo"])
+        self.assertEqual(draft["themes"]["indigena"]["rows"][0]["titulo"], "")
+
+        first_block.locator(".theme-no-acervo-checkbox").uncheck()
+        self.assertFalse(
+            first_block.locator('[data-column-key="titulo"]').nth(0).is_disabled()
+        )
+
+    def test_theme_without_collection_from_empty_block(self):
+        page = self.page
+        self.fill_identification()
+        self.select_school()
+
+        first_block = page.locator(".theme-block").nth(0)
+        self.assertEqual(first_block.locator("tbody tr").count(), 5)
+        self.assertFalse(first_block.locator(".theme-no-acervo-checkbox").is_checked())
+
+        first_block.locator(".theme-no-acervo-checkbox").check()
+
+        expect(page.locator("#theme-no-acervo-dialog")).to_be_hidden()
+        self.assertTrue(first_block.locator(".theme-no-acervo-checkbox").is_checked())
+        self.assertTrue(
+            first_block.locator('[data-column-key="titulo"]').nth(0).is_disabled()
+        )
+        self.assertTrue(first_block.locator(".add-theme-rows").is_disabled())
+        expect(first_block.locator("tbody tr")).to_have_count(1)
+
+        draft = page.evaluate(
+            "() => JSON.parse(localStorage.getItem('registro-livros:v3:draft'))"
+        )
+        self.assertTrue(draft["themes"]["indigena"]["semAcervo"])
+
+        first_block.locator(".theme-no-acervo-checkbox").uncheck()
+        self.assertFalse(first_block.locator(".theme-no-acervo-checkbox").is_checked())
+        self.assertFalse(
+            first_block.locator('[data-column-key="titulo"]').nth(0).is_disabled()
+        )
+
+    def test_submit_validation_then_success(self):
         page = self.page
         self.fill_identification()
         self.select_school()
@@ -243,12 +346,7 @@ class AppUiTest(unittest.TestCase):
             african_block.locator("tbody tr").nth(0).get_attribute("class"),
         )
 
-        row = african_block.locator("tbody tr").nth(0)
-        row.locator('[data-column-key="autor"]').fill("Autor")
-        row.locator('[data-column-key="editora"]').fill("Editora")
-        quantity = row.locator('[data-column-key="quantidade"]')
-        quantity.fill("2")
-        quantity.dispatch_event("change")
+        self.fill_theme_row(block_index=1, row_index=0)
 
         page.click("#submit-survey-v3")
         expect(page.locator("#survey-feedback-v3")).to_contain_text(
@@ -265,22 +363,40 @@ class AppUiTest(unittest.TestCase):
             boxes.nth(index).check()
 
         page.click("#submit-survey-v3")
+        expect(page.locator("#survey-feedback-v3")).to_contain_text(
+            "Preencha pelo menos uma linha válida"
+        )
+        expect(page.locator("#survey-feedback-v3")).to_contain_text(
+            "Temática Indígena"
+        )
+
+        self.fill_theme_row(block_index=0, row_index=0, title="Livro Indígena")
+
+        page.click("#submit-survey-v3")
         expect(page.locator("#survey-feedback-v3")).to_have_text(
-            "Levantamento salvo com sucesso."
+            "Resposta enviada com sucesso."
         )
         self.assertIn(
             "success", page.locator("#survey-feedback-v3").get_attribute("class")
         )
-        expect(page.locator("#cdd-form-status")).to_contain_text("Salvo em")
-        self.assertEqual(
-            page.locator("#submit-survey-v3").text_content().strip(), "Salvar"
-        )
+        expect(page.locator("#submit-survey-v3")).to_have_text("Enviar resposta")
 
         draft = page.evaluate(
             "() => JSON.parse(localStorage.getItem('registro-livros:v3:draft'))"
         )
-        self.assertTrue(draft["cddMeta"]["savedAt"])
-        self.assertFalse(draft["cddMeta"]["saveError"])
+        self.assertEqual(draft["version"], 4)
+        self.assertNotIn("cddMeta", draft)
+
+        self.assertEqual(len(self.submitted_payloads), 1)
+        submitted = self.submitted_payloads[0]
+        self.assertEqual(submitted["responsavel"], "MARIA")
+        self.assertEqual(submitted["matricula"], 12345)
+        self.assertEqual(len(submitted["cdd"]), 8)
+        self.assertTrue(all(item["semAcervo"] for item in submitted["cdd"]))
+        self.assertEqual(submitted["temas"][0]["semAcervo"], False)
+        self.assertEqual(submitted["temas"][1]["semAcervo"], False)
+        self.assertEqual(submitted["temas"][0]["livros"][0]["titulo"], "LIVRO INDIGENA")
+        self.assertNotIn("rowId", submitted["temas"][0]["livros"][0])
 
     def test_school_change_dialog_cancel_and_confirm(self):
         page = self.page

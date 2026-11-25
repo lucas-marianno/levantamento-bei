@@ -14,25 +14,20 @@ export function buildSurveyPayloadV3({ form, school, cdd, themes }) {
     matricula,
     escola: school,
     cdd,
-    temas: themes.map(({ id, label, rows }) => ({
+    temas: themes.map(({ id, label, semAcervo, rows }) => ({
       id,
       label,
-      livros: rows
-        .filter((values) => !valuesAreEmpty(THEME_COLUMNS, values))
-        .map((values) => {
-          const livro = {
-            titulo: values.titulo,
-            autor: values.autor,
-            editora: values.editora,
-            quantidade: Number(values.quantidade),
-          };
-
-          if (values.rowId) {
-            livro.rowId = values.rowId;
-          }
-
-          return livro;
-        }),
+      semAcervo: Boolean(semAcervo),
+      livros: semAcervo
+        ? []
+        : rows
+            .filter((values) => !valuesAreEmpty(THEME_COLUMNS, values))
+            .map((values) => ({
+              titulo: values.titulo,
+              autor: values.autor,
+              editora: values.editora,
+              quantidade: Number(values.quantidade),
+            })),
     })),
   };
 }
